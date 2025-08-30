@@ -1,0 +1,65 @@
+using Gtk 4.0;
+using Adw 1;
+
+Adw.Dialog spot_page {
+  title: _("Re-Spot");
+  width-request: 500;
+  
+  Adw.Clamp {
+    child: Box {
+      orientation: vertical;
+      spacing: 12;
+      margin-top: 12;
+      margin-bottom: 12;
+      margin-start: 12;
+      margin-end: 12;
+
+      Adw.PreferencesGroup {
+        title: _("Re-Spot");
+
+        Adw.EntryRow activator_callsign {
+          title: _("Activator Callsign");
+          editable: false;
+          text: "K0VCZ";
+        }
+
+        Adw.EntryRow spotter_callsign {
+          title: _("Spotter Callsign");
+          editable: false;
+          text: "N0ABC";
+        }
+
+        Adw.EntryRow frequency {
+          title: _("Frequency (Hz)");
+          text: "14074";
+        }
+
+        Adw.EntryRow park_ref {
+          title: _("Park Reference");
+          text: "K-Test";
+        }
+
+        Adw.EntryRow spotter_comments {
+          title: _("Spotter Comments");
+          text: "";
+        }
+      }
+
+      Box {
+        orientation: horizontal;
+        halign: end;
+        spacing: 6;
+        margin-bottom: 12;
+
+        Button cancel_button {
+          label: _("Cancel");
+        }
+
+        Button submit_button {
+          label: _("Spot");
+          styles ["suggested-action"]
+        }
+      }
+    };
+  }
+}

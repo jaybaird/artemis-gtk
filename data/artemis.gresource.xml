@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <gresource prefix="/com/k0vcz/artemis/data/ui/">
+    <file preprocess="xml-stripblanks" alias="preferences.ui">build/blueprint/preferences.ui</file>
+    <file preprocess="xml-stripblanks" alias="main_window.ui">build/blueprint/main_window.ui</file>
+    <file preprocess="xml-stripblanks" alias="spot_card.ui">build/blueprint/spot_card.ui</file>
+    <file preprocess="xml-stripblanks" alias="status_page.ui">build/blueprint/status_page.ui</file>
+    <file preprocess="xml-stripblanks" alias="spot_page.ui">build/blueprint/spot_page.ui</file>
+    <file preprocess="xml-stripblanks" alias="add_spot_page.ui">build/blueprint/add_spot_page.ui</file>
+  </gresource>
+
+  <gresource prefix="/com/k0vcz/artemis/">
+    <file compressed="true">data/css/style.css</file>
+  </gresource>
+
+  <!-- Icons live under /com/k0vcz/artemis/icons/hicolor/... -->
+  <gresource prefix="/com/k0vcz/artemis/icons">
+    <!-- symbolic actions -->
+    <file preprocess="xml-stripblanks" alias="hicolor/scalable/actions/symbolic/update-symbolic.svg">data/icons/hicolor/scalable/actions/symbolic/update-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="hicolor/scalable/actions/symbolic/history-undo-symbolic.svg">data/icons/hicolor/scalable/actions/symbolic/history-undo-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="hicolor/scalable/actions/symbolic/bullseye-symbolic.svg">data/icons/hicolor/scalable/actions/symbolic/bullseye-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="hicolor/scalable/actions/symbolic/test-pass-symbolic.svg">data/icons/hicolor/scalable/actions/symbolic/test-pass-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="hicolor/scalable/actions/symbolic/radio-console-symbolic.svg">data/icons/hicolor/scalable/actions/symbolic/radio-console-symbolic.svg</file>
+    <file preprocess="xml-stripblanks" alias="hicolor/scalable/actions/symbolic/sound-wave-alt-symbolic.svg">data/icons/hicolor/scalable/actions/symbolic/sound-wave-alt-symbolic.svg</file>
+
+    <!-- band color icons (non-symbolic) -->
+    <file preprocess="xml-stripblanks" alias="hicolor/scalable/status/band-all.svg">data/icons/hicolor/scalable/status/band-All.svg</file>
+    <file preprocess="xml-stripblanks" alias="hicolor/scalable/status/band-160m.svg">data/icons/hicolor/scalable/status/band-160m.svg</file>
+    <file preprocess="xml-stripblanks" alias="hicolor/scalable/status/band-80m.svg">data/icons/hicolor/scalable/status/band-80m.svg</file>
+    <file preprocess="xml-stripblanks" alias="hicolor/scalable/status/band-60m.svg">data/icons/hicolor/scalable/status/band-60m.svg</file>
+    <file preprocess="xml-stripblanks" alias="hicolor/scalable/status/band-40m.svg">data/icons/hicolor/scalable/status/band-40m.svg</file>
+    <file preprocess="xml-stripblanks" alias="hicolor/scalable/status/band-30m.svg">data/icons/hicolor/scalable/status/band-30m.svg</file>
+    <file preprocess="xml-stripblanks" alias="hicolor/scalable/status/band-20m.svg">data/icons/hicolor/scalable/status/band-20m.svg</file>
+    <file preprocess="xml-stripblanks" alias="hicolor/scalable/status/band-17m.svg">data/icons/hicolor/scalable/status/band-17m.svg</file>
+    <file preprocess="xml-stripblanks" alias="hicolor/scalable/status/band-15m.svg">data/icons/hicolor/scalable/status/band-15m.svg</file>
+    <file preprocess="xml-stripblanks" alias="hicolor/scalable/status/band-12m.svg">data/icons/hicolor/scalable/status/band-12m.svg</file>
+    <file preprocess="xml-stripblanks" alias="hicolor/scalable/status/band-10m.svg">data/icons/hicolor/scalable/status/band-10m.svg</file>
+    <file preprocess="xml-stripblanks" alias="hicolor/scalable/status/band-6m.svg">data/icons/hicolor/scalable/status/band-6m.svg</file>
+    <file preprocess="xml-stripblanks" alias="hicolor/scalable/status/band-2m.svg">data/icons/hicolor/scalable/status/band-2m.svg</file>
+  </gresource>
+</gresources>

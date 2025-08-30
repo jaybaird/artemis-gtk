@@ -1,0 +1,4 @@
+src/artemis.c
+src/spot_card.c
+build/blueprint/main_window.ui
+build/blueprint/spot_card.ui
