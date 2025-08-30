@@ -44,11 +44,6 @@ static GVariant *map_d_to_i (const GValue *in_prop, const GVariantType *expected
   return g_variant_new_int32 (v);
 }
 
-/* Connection types for radio settings */
-static const char *const CONNECTION_TYPES_DISPLAY[] = {
-  "None", "Serial", "Network", "USB"
-};
-
 static const char *const CONNECTION_TYPES_VALUES[] = {
   "none", "serial", "network", "usb"
 };
