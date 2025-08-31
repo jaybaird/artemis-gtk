@@ -525,7 +525,7 @@ static BandView *add_band_page(AdwViewStack *stack, GListModel *base, const char
   view->sorted = gtk_sort_list_model_new(G_LIST_MODEL(view->filtered), sorter);
 
   view->flow = gtk_flow_box_new();
-  gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(view->flow), 12);
+  gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(view->flow), 6);
   gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(view->flow), 12);
   gtk_flow_box_set_selection_mode(GTK_FLOW_BOX(view->flow), GTK_SELECTION_NONE);
   gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(view->flow), 4);

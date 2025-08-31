@@ -2,6 +2,7 @@
 #include "gio/gio.h"
 #include "glib-object.h"
 #include "glib.h"
+#include "libsoup/soup-cache.h"
 #include "libsoup/soup-session.h"
 #include "spot.h"
 
@@ -13,6 +14,7 @@ struct _PotaClient {
   GObject parent_instance;
 
   SoupSession *session;
+  SoupCache   *session_cache;
   gchar       *auth_header;
   gchar       *source;
   gchar       *base_url;
@@ -448,6 +450,15 @@ static void pota_client_class_init(PotaClientClass *klass)
 static void pota_client_init(PotaClient *self)
 {
   self->session = soup_session_new();
+
+  const gchar *data_dir = g_get_user_data_dir();
+  g_autofree gchar *app_dir = g_build_filename(data_dir, "com.k0vcz.artemis", NULL);
+  g_mkdir_with_parents(app_dir, 0700);
+  g_autofree gchar *cache_path = g_build_filename(app_dir, "libsoup.cache", NULL);
+  self->session_cache = soup_cache_new(cache_path, SOUP_CACHE_SINGLE_USER);
+
+  soup_session_add_feature(self->session, SOUP_SESSION_FEATURE(self->session_cache));
+
   self->source = g_strdup("Artemis/1.0");
   self->base_url = g_strdup("https://api.pota.app");
   g_object_set(self->session, "timeout", 30, "idle-timeout", 15, NULL);
