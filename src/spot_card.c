@@ -14,6 +14,7 @@
 #include "spot_repo.h"
 #include "pota_user_cache.h"
 #include "artemis.h"
+#include "spot_history_dialog.h"
 
 #include <glib/gi18n.h>
 #include <json-glib/json-glib.h>
@@ -37,7 +38,10 @@ struct _SpotCard {
 
   GtkButton *spot_button;
   GtkButton *tune_button;
+  GtkButton *history_button;
+  GtkButton *park_details_button;
 
+  SpotHistoryDialog *history_dialog;
   GWeakRef spot;
 };
 
@@ -47,6 +51,7 @@ static void spot_card_dispose(GObject *gobject)
 {
   SpotCard *self = ARTEMIS_SPOT_CARD(gobject);
   g_weak_ref_clear(&self->spot);
+  g_clear_object(&self->history_dialog);
 
   gtk_widget_dispose_template(GTK_WIDGET(gobject), ARTEMIS_TYPE_SPOT_CARD);
   G_OBJECT_CLASS(spot_card_parent_class)->dispose(gobject);
@@ -101,12 +106,124 @@ static void on_tune_button_clicked(GtkButton *button, gpointer user_data)
     return;
   }
   
-  // Get the app instance and emit the tune signal
-  GtkRoot *root = gtk_widget_get_root(GTK_WIDGET(button));
-  ArtemisApp *app = ARTEMIS_APP(gtk_window_get_application(GTK_WINDOW(root)));
+  // Get the default app instance and emit the tune signal
+  ArtemisApp *app = ARTEMIS_APP(g_application_get_default());
   
   double frequency_hz = artemis_spot_get_frequency_hz(spot);
-  artemis_app_emit_tune_frequency(app, frequency_hz);
+  artemis_app_emit_tune_frequency(app, frequency_hz, spot);
+  
+  g_object_unref(spot);
+}
+
+static void on_spot_history_received(GObject *source, GAsyncResult *result, gpointer user_data)
+{
+  PotaClient *client = ARTEMIS_POTA_CLIENT(source);
+  SpotCard *self = ARTEMIS_SPOT_CARD(user_data);
+  
+  GError *error = NULL;
+  JsonNode *root = pota_client_get_spot_history_finish(client, result, &error);
+  
+  if (error) {
+    g_warning("Failed to fetch spot history: %s", error->message);
+    if (self->history_dialog) {
+      spot_history_dialog_show_error(self->history_dialog, error->message);
+    }
+    g_error_free(error);
+    return;
+  }
+  
+  if (root && self->history_dialog) {
+    spot_history_dialog_show_history(self->history_dialog, root);
+    json_node_unref(root);
+  }
+}
+
+static void on_history_button_clicked(GtkButton *button, gpointer user_data)
+{
+  SpotCard *self = ARTEMIS_SPOT_CARD(user_data);
+  ArtemisSpot *spot = g_weak_ref_get(&self->spot);
+  
+  if (!spot) {
+    g_debug("Spot is NULL in on_history_button_clicked");
+    return;
+  }
+  
+  const char *callsign = artemis_spot_get_callsign(spot);
+  const char *park_ref = artemis_spot_get_park_ref(spot);
+  
+  g_debug("Retrieved from spot: callsign='%s', park_ref='%s'", callsign ? callsign : "NULL", park_ref ? park_ref : "NULL");
+  
+  if (!callsign || !park_ref) {
+    g_warning("Missing callsign or park_ref for history request");
+    g_object_unref(spot);
+    return;
+  }
+  
+  // Create dialog if it doesn't exist
+  if (!self->history_dialog) {
+    self->history_dialog = spot_history_dialog_new();
+  }
+  
+  // Set dialog title and show loading state
+  spot_history_dialog_set_callsign_and_park(self->history_dialog, callsign, park_ref);
+  spot_history_dialog_show_loading(self->history_dialog);
+  
+  // Present the dialog
+  GtkRoot *root = gtk_widget_get_root(GTK_WIDGET(self));
+  if (root && GTK_IS_WINDOW(root)) {
+    adw_dialog_present(ADW_DIALOG(self->history_dialog), GTK_WIDGET(root));
+  }
+  
+  // Get the POTA client from the app's spot repo and fetch data
+  ArtemisApp *app = ARTEMIS_APP(g_application_get_default());
+  if (app) {
+    ArtemisSpotRepo *repo = artemis_app_get_spot_repo(app);
+    if (repo) {
+      PotaClient *client = artemis_spot_repo_get_pota_client(repo);
+      if (client) {
+        g_debug("Fetching spot history for %s @ %s", callsign, park_ref);
+        g_debug("Callsign length: %zu, Park ref length: %zu", strlen(callsign), strlen(park_ref));
+        pota_client_get_spot_history_async(client, callsign, park_ref, NULL, 
+                                           on_spot_history_received, self);
+      }
+    }
+  }
+  
+  g_object_unref(spot);
+}
+
+static void on_park_details_button_clicked(GtkButton *button, gpointer user_data)
+{
+  SpotCard *self = ARTEMIS_SPOT_CARD(user_data);
+  ArtemisSpot *spot = g_weak_ref_get(&self->spot);
+  
+  if (!spot) {
+    g_debug("Spot is NULL in on_park_details_button_clicked");
+    return;
+  }
+  
+  const char *park_ref = artemis_spot_get_park_ref(spot);
+  
+  if (!park_ref || !*park_ref) {
+    g_warning("Missing park_ref for park details request");
+    g_object_unref(spot);
+    return;
+  }
+  
+  // Construct the POTA park page URL
+  g_autofree char *url = g_strdup_printf("https://pota.app/#/park/%s", park_ref);
+  
+  g_debug("Opening park details URL: %s", url);
+  
+  // Open URL in default browser using GTK4 API
+  GtkUriLauncher *launcher = gtk_uri_launcher_new(url);
+  
+  // Get the parent window for the launcher
+  GtkRoot *root = gtk_widget_get_root(GTK_WIDGET(self));
+  GtkWindow *parent_window = GTK_IS_WINDOW(root) ? GTK_WINDOW(root) : NULL;
+  
+  gtk_uri_launcher_launch(launcher, parent_window, NULL, NULL, NULL);
+  g_object_unref(launcher);
   
   g_object_unref(spot);
 }
@@ -241,6 +358,8 @@ static void spot_card_class_init(SpotCardClass *klass) {
   gtk_widget_class_set_template_from_resource(widget_class, "/com/k0vcz/artemis/data/ui/spot_card.ui");
   gtk_widget_class_bind_template_callback (widget_class, on_spot_button_clicked);
   gtk_widget_class_bind_template_callback (widget_class, on_tune_button_clicked);
+  gtk_widget_class_bind_template_callback (widget_class, on_history_button_clicked);
+  gtk_widget_class_bind_template_callback (widget_class, on_park_details_button_clicked);
 
   gtk_widget_class_bind_template_child(widget_class, SpotCard, activator_avatar);
   gtk_widget_class_bind_template_child(widget_class, SpotCard, title);
@@ -255,6 +374,8 @@ static void spot_card_class_init(SpotCardClass *klass) {
   gtk_widget_class_bind_template_child(widget_class, SpotCard, corner_image);
   gtk_widget_class_bind_template_child(widget_class, SpotCard, spot_button);
   gtk_widget_class_bind_template_child(widget_class, SpotCard, tune_button);
+  gtk_widget_class_bind_template_child(widget_class, SpotCard, history_button);
+  gtk_widget_class_bind_template_child(widget_class, SpotCard, park_details_button);
 
   gtk_widget_class_bind_template_callback(widget_class, G_CALLBACK(on_spot_button_clicked));
 
@@ -309,8 +430,13 @@ GtkWidget *spot_card_new_from_spot(gpointer user_data)
   
   spot_card_set_corner_image_visible(card, hunted_today);
 
+  if (hunted_today)
+  {
+    gtk_widget_add_css_class(GTK_WIDGET(card), "dimmed");
+  }
+
   // Check if activator is QRT and apply dimmed styling
-  const char *activator_comment = artemis_spot_get_activator_comment(spot);
+  const char *activator_comment = g_utf8_strup(artemis_spot_get_activator_comment(spot), -1);
   if (activator_comment && g_strstr_len(activator_comment, -1, "QRT")) {
     gtk_widget_add_css_class(GTK_WIDGET(card), "dimmed");
   }
@@ -346,4 +472,43 @@ void spot_card_set_corner_image_visible(SpotCard *self, gboolean visible)
 {
   g_return_if_fail(ARTEMIS_IS_SPOT_CARD(self));
   gtk_widget_set_visible(GTK_WIDGET(self->corner_image), visible);
+}
+
+void spot_card_update_pinned_state(SpotCard *self)
+{
+  g_return_if_fail(ARTEMIS_IS_SPOT_CARD(self));
+  
+  ArtemisSpot *card_spot = g_weak_ref_get(&self->spot);
+  if (!card_spot) {
+    return;
+  }
+  
+  // Get the pinned spot from the app
+  ArtemisApp *app = ARTEMIS_APP(g_application_get_default());
+  ArtemisSpot *pinned_spot = artemis_app_get_pinned_spot(app);
+  
+  // Check if this card's spot is the pinned spot
+  gboolean is_pinned = (pinned_spot && card_spot == pinned_spot);
+  
+  // Add or remove the pinned CSS class to the inner card box
+  // The SpotCard is a GtkBox that contains an AdwClamp, which contains another Box with "card" and "frame" styles
+  GtkWidget *clamp = gtk_widget_get_first_child(GTK_WIDGET(self));
+  if (clamp && ADW_IS_CLAMP(clamp)) {
+    GtkWidget *inner_box = gtk_widget_get_first_child(clamp);
+    if (inner_box && GTK_IS_BOX(inner_box)) {
+      if (is_pinned) {
+        g_debug("Adding 'pinned' CSS class to spot card for %s", artemis_spot_get_callsign(card_spot));
+        gtk_widget_add_css_class(inner_box, "pinned");
+      } else {
+        g_debug("Removing 'pinned' CSS class from spot card for %s", artemis_spot_get_callsign(card_spot));
+        gtk_widget_remove_css_class(inner_box, "pinned");
+      }
+    }
+  }
+  
+  // Cleanup
+  g_object_unref(card_spot);
+  if (pinned_spot) {
+    g_object_unref(pinned_spot);
+  }
 }

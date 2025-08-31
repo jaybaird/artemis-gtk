@@ -42,4 +42,15 @@ void      pota_client_get_activator_async (PotaClient         *self,
 JsonNode* pota_client_get_activator_finish(PotaClient   *self,
                                            GAsyncResult *res,
                                            GError      **error);
+
+void      pota_client_get_spot_history_async (PotaClient         *self,
+                                              const gchar        *callsign,
+                                              const gchar        *park_ref,
+                                              GCancellable       *cancellable,
+                                              GAsyncReadyCallback callback,
+                                              gpointer            user_data);
+
+JsonNode* pota_client_get_spot_history_finish(PotaClient   *self,
+                                              GAsyncResult *res,
+                                              GError      **error);
 G_END_DECLS

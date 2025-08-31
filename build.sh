@@ -8,7 +8,7 @@ glib-compile-schemas --strict \
   data
 
 printf "Running blueprint compiler..."
-blueprint-compiler batch-compile build . blueprint/main_window.blp blueprint/spot_card.blp blueprint/preferences.blp blueprint/status_page.blp blueprint/spot_page.blp blueprint/add_spot_page.blp &&
+blueprint-compiler batch-compile build . blueprint/main_window.blp blueprint/spot_card.blp blueprint/preferences.blp blueprint/status_page.blp blueprint/spot_page.blp blueprint/add_spot_page.blp blueprint/spot_history_dialog.blp &&
 
 #printf "\nRunning meson setup...\n"
 #meson setup --reconfigure build && 

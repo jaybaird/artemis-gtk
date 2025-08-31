@@ -335,6 +335,98 @@ JsonNode *pota_client_get_activator_finish(PotaClient *self, GAsyncResult *res, 
   return g_task_propagate_pointer(G_TASK(res), error);
 }
 
+static void get_spot_history_cb(GObject *source, GAsyncResult *res, gpointer user_data) {
+  GTask *task = G_TASK(user_data);
+  PotaClient *self = g_task_get_source_object(task);
+  TaskData *td = g_task_get_task_data(task);
+  (void)self;
+
+  GError *error = NULL;
+  GBytes *body  = soup_session_send_and_read_finish(SOUP_SESSION(source), res, &error);
+  if (error) {
+    g_task_return_error(task, error);
+    g_object_unref(task);
+    return;
+  }
+
+  guint status = soup_message_get_status(td->msg);
+  if (status < 200 || status >= 300) {
+    const char *phrase = soup_status_get_phrase(status);
+    g_task_return_new_error(task, G_IO_ERROR, G_IO_ERROR_FAILED,
+                            "HTTP %u %s", status, phrase ? phrase : "");
+    if (body) g_bytes_unref(body);
+    g_object_unref(task);
+    return;
+  }
+
+  gsize body_size;
+  const char *body_str = g_bytes_get_data(body, &body_size);
+  
+  JsonParser *parser = json_parser_new();
+  if (!json_parser_load_from_data(parser, body_str, body_size, &error)) {
+    g_task_return_error(task, error);
+    g_object_unref(parser);
+    g_bytes_unref(body);
+    g_object_unref(task);
+    return;
+  }
+
+  JsonNode *root = json_parser_get_root(parser);
+  JsonNode *copy = json_node_copy(root);
+  
+  g_task_return_pointer(task, copy, (GDestroyNotify)json_node_unref);
+  g_object_unref(parser);
+  g_bytes_unref(body);
+  g_object_unref(task);
+}
+
+void pota_client_get_spot_history_async(PotaClient *self,
+                                        const gchar *callsign,
+                                        const gchar *park_ref,
+                                        GCancellable *cancellable,
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data)
+{
+  g_return_if_fail(ARTEMIS_IS_POTA_CLIENT(self));
+  g_return_if_fail(callsign && *callsign);
+  g_return_if_fail(park_ref && *park_ref);
+
+  g_debug("pota_client_get_spot_history_async: callsign='%s' (%zu chars), park_ref='%s' (%zu chars)", 
+          callsign, strlen(callsign), park_ref, strlen(park_ref));
+
+  g_autofree gchar *escaped_callsign = g_uri_escape_string(callsign, NULL, FALSE);
+  g_autofree gchar *escaped_park_ref = g_uri_escape_string(park_ref, NULL, FALSE);
+  g_autofree gchar *url = g_strconcat(self->base_url, "/v1/spots/", escaped_callsign, "/", escaped_park_ref, NULL);
+  
+  g_debug("Constructed URL: %s", url);
+  
+  SoupMessage *msg = soup_message_new("GET", url);
+
+  SoupMessageHeaders *hdr = soup_message_get_request_headers(msg);
+  soup_message_headers_replace(hdr, "Accept", "application/json");
+  soup_message_headers_replace(hdr, "User-Agent", "Artemis/1.0 (+POTA client)");
+  if (self->auth_header && *self->auth_header)
+  {
+    soup_message_headers_replace(hdr, "Authorization", self->auth_header);
+  }
+
+  GTask *task = g_task_new(self, cancellable, callback, user_data);
+  TaskData *td = g_new0(TaskData, 1);
+  td->msg = g_object_ref(msg);
+  g_task_set_task_data(task, td, (GDestroyNotify)task_data_free);
+
+  soup_session_send_and_read_async(self->session, msg, G_PRIORITY_DEFAULT,
+                                   cancellable, get_spot_history_cb, task);
+
+  g_object_unref(msg);
+}
+
+JsonNode *pota_client_get_spot_history_finish(PotaClient *self, GAsyncResult *res, GError **error) {
+  g_return_val_if_fail(ARTEMIS_IS_POTA_CLIENT(self), NULL);
+  g_return_val_if_fail(g_task_is_valid(res, self), NULL);
+  return g_task_propagate_pointer(G_TASK(res), error);
+}
+
 static void pota_client_finalize(GObject *obj)
 {
   PotaClient *self = ARTEMIS_POTA_CLIENT(obj);

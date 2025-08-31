@@ -7,6 +7,7 @@
 #include "pota_client.h"
 #include "pota_user_cache.h"
 #include "spot.h"
+#include "database.h"
 
 enum {
   SIGNAL_BUSY_CHANGED,
@@ -151,6 +152,33 @@ static void on_update_spots(GObject *src, GAsyncResult *result, gpointer user_da
       ArtemisSpot *spot = artemis_spot_new_from_json(o);
       g_list_store_append(self->spot_store, spot);
       
+      // Check if this spot was posted by the user from an external program
+      const char *spotter = artemis_spot_get_spotter(spot);
+      if (spotter && *spotter) {
+        GSettings *settings = g_settings_new("com.k0vcz.artemis");
+        g_autofree gchar *user_callsign = g_settings_get_string(settings, "callsign");
+        
+        if (user_callsign && g_strcmp0(spotter, user_callsign) == 0) {
+          // This is a spot posted by the user from an external program
+          // Add it to the database as a hunted QSO
+          const char *callsign = artemis_spot_get_callsign(spot);
+          const char *park_ref = artemis_spot_get_park_ref(spot);
+          
+          if (callsign && park_ref) {
+            g_debug("Auto-marking externally spotted park as hunted: %s @ %s", callsign, park_ref);
+            sqlite3_int64 qso_id = 0;
+            GError *db_err = NULL;
+            if (!spot_db_add_qso_from_spot(spot_db_get_instance(), spot, &qso_id, &db_err)) {
+              g_warning("Failed to add externally spotted QSO to database: %s", 
+                       db_err ? db_err->message : "Unknown error");
+              g_clear_error(&db_err);
+            }
+          }
+        }
+        
+        g_object_unref(settings);
+      }
+      
       // Fetch activator data for unique callsigns
       const char *callsign = artemis_spot_get_callsign(spot);
       if (callsign && *callsign && !g_hash_table_contains(data->unique_callsigns, callsign)) {
@@ -160,7 +188,6 @@ static void on_update_spots(GObject *src, GAsyncResult *result, gpointer user_da
       }
       
       // Also fetch spotter/hunter data for unique callsigns
-      const char *spotter = artemis_spot_get_spotter(spot);
       if (spotter && *spotter && !g_hash_table_contains(data->unique_callsigns, spotter)) {
         g_hash_table_add(data->unique_callsigns, g_strdup(spotter));
         artemis_pota_user_cache_get_async(self->pota_user_cache, spotter, data->ttl_seconds,

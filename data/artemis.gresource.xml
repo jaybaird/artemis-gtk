@@ -7,6 +7,7 @@
     <file preprocess="xml-stripblanks" alias="status_page.ui">build/blueprint/status_page.ui</file>
     <file preprocess="xml-stripblanks" alias="spot_page.ui">build/blueprint/spot_page.ui</file>
     <file preprocess="xml-stripblanks" alias="add_spot_page.ui">build/blueprint/add_spot_page.ui</file>
+    <file preprocess="xml-stripblanks" alias="spot_history_dialog.ui">build/blueprint/spot_history_dialog.ui</file>
   </gresource>
 
   <gresource prefix="/com/k0vcz/artemis/">

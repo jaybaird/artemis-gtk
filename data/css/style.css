@@ -43,3 +43,12 @@ banner {
     text-align: left;
     font-weight: normal;
 }
+
+/* Pinned spot card styling */
+box.pinned.card.frame {
+    border: 2px solid @accent_color;
+}
+
+box.pinned.card.frame:hover {
+    border-color: @accent_bg_color;
+}

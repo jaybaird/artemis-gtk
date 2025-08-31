@@ -8,11 +8,11 @@ template $SpotCard : Box {
 
   Adw.Clamp {
     maximum-size: 300;
-    tightening-threshold: 300;
+    tightening-threshold: 280;
 
     child:
   Box {
-    width-request: 300;
+    width-request: 280;
     height-request: 180;
     orientation: vertical;
 
@@ -197,7 +197,8 @@ template $SpotCard : Box {
         Box {
           halign: start;
           spacing: 6;
-          Button {
+          Button history_button {
+            clicked => $on_history_button_clicked();
             Image {
               tooltip-text: _("History");
               icon-name: "history-undo-symbolic";
@@ -205,7 +206,7 @@ template $SpotCard : Box {
             }
           }
 
-          Button {
+          Button logbook_button {
             Image {
               tooltip-text: _("Logbook");
               icon-name: "format-ordered-list-symbolic";
@@ -213,7 +214,8 @@ template $SpotCard : Box {
             }
           }
 
-          Button {
+          Button park_details_button {
+            clicked => $on_park_details_button_clicked();
             Image {
               tooltip-text: _("Park details");
               icon-name: "org.gnome.Maps-symbolic";
@@ -229,6 +231,13 @@ template $SpotCard : Box {
         Box {
           spacing: 6;
           halign: end;
+          
+          Button tune_button {
+            tooltip-text: _("Tune your radio to this frequency");
+            label: _("Tune");
+            clicked => $on_tune_button_clicked();
+          }
+
           Button spot_button {
             tooltip-text: _("Re-spot this park");
             label: _("Re-Spot");
@@ -236,11 +245,7 @@ template $SpotCard : Box {
             clicked => $on_spot_button_clicked();
           }
 
-          Button tune_button {
-            tooltip-text: _("Tune your radio to this frequency");
-            label: _("Tune");
-            clicked => $on_tune_button_clicked();
-          }
+          
         }
       }
   };

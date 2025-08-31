@@ -30,6 +30,8 @@ static void artemis_app_activate(GApplication *app);
 static void artemis_app_class_init(ArtemisAppClass *class);
 static void artemis_app_init(ArtemisApp* self);
 static void artemis_app_dispose(GObject *object);
+static void artemis_app_start_connection_monitoring(ArtemisApp *self);
+static void artemis_app_stop_connection_monitoring(ArtemisApp *self);
 
 static guint app_signals[N_SIGNALS];
 
@@ -48,6 +50,8 @@ struct _ArtemisApp {
   // Radio connection management
   RIG             *rig;
   gboolean        radio_connected;
+  guint           radio_check_source_id; // For periodic connection checks
+  gulong          settings_changed_handler; // For settings change monitoring
   GPtrArray       *pages;
 
   AdwToastOverlay *toast_overlay;
@@ -61,6 +65,11 @@ struct _ArtemisApp {
   
   // Mode filtering
   gchar           *current_mode_filter;
+  
+  // Pinned spot tracking
+  gchar           *pinned_spot_callsign;
+  gchar           *pinned_spot_park_ref;
+  guint64         pinned_spot_frequency_hz;
 };
 
 typedef struct {
@@ -75,6 +84,7 @@ typedef struct {
   GtkWidget           *flow;
   GtkFilter           *filter;
   GtkFilterListModel  *filtered;
+  GtkSortListModel    *sorted;
   GtkScrolledWindow   *scroller;
   StatusPage          *empty;
   gchar               *current_search_text; // cached search text for this view
@@ -82,7 +92,7 @@ typedef struct {
 } BandView;
 
 static void band_view_update_empty(BandView *bv) {
-  guint n = g_list_model_get_n_items(G_LIST_MODEL(bv->filtered));
+  guint n = g_list_model_get_n_items(G_LIST_MODEL(bv->sorted));
 
   gtk_widget_set_visible(GTK_WIDGET(bv->scroller), n > 0);
   gtk_widget_set_visible(GTK_WIDGET(bv->empty), n == 0);
@@ -96,8 +106,94 @@ static void band_view_free(BandView *view) {
   }
 }
 
+// Radio connection task data
+typedef struct {
+  ArtemisApp *app;
+  gint model_id;
+  gchar *connection_type;
+  gchar *device_path;
+  gchar *network_host;
+  gint network_port;
+  gint baud_rate;
+} RadioConnectionData;
+
+static void radio_connection_data_free(RadioConnectionData *data) {
+  if (data) {
+    g_object_unref(data->app);
+    g_free(data->connection_type);
+    g_free(data->device_path);
+    g_free(data->network_host);
+    g_free(data);
+  }
+}
+
+// Background thread radio connection function
+static void radio_connection_thread_func(GTask *task, gpointer source_object, 
+                                        gpointer task_data, GCancellable *cancellable)
+{
+  RadioConnectionData *data = (RadioConnectionData *)task_data;
+  RIG *rig = NULL;
+  GError *error = NULL;
+  
+  // Initialize rig
+  rig = rig_init(data->model_id);
+  if (!rig) {
+    g_set_error(&error, G_IO_ERROR, G_IO_ERROR_FAILED, 
+                "Failed to initialize radio model %d", data->model_id);
+    g_task_return_error(task, error);
+    return;
+  }
+  
+  // Configure connection based on type
+  if (g_strcmp0(data->connection_type, "serial") == 0 || g_strcmp0(data->connection_type, "usb") == 0) {
+    strncpy(rig->state.rigport.pathname, data->device_path, HAMLIB_FILPATHLEN - 1);
+    rig->state.rigport.parm.serial.rate = data->baud_rate;
+  } else if (g_strcmp0(data->connection_type, "network") == 0) {
+    g_snprintf(rig->state.rigport.pathname, HAMLIB_FILPATHLEN, "%s:%d", 
+               data->network_host, data->network_port);
+  }
+  
+  // Attempt connection
+  int result = rig_open(rig);
+  if (result != RIG_OK) {
+    g_set_error(&error, G_IO_ERROR, G_IO_ERROR_CONNECTION_REFUSED,
+                "Failed to connect to radio: %s", rigerror(result));
+    rig_cleanup(rig);
+    g_task_return_error(task, error);
+    return;
+  }
+  
+  // Success - return the rig
+  g_task_return_pointer(task, rig, (GDestroyNotify)rig_cleanup);
+}
+
+// Async callback when radio connection completes
+static void on_radio_connection_complete(GObject *source, GAsyncResult *result, gpointer user_data)
+{
+  ArtemisApp *self = ARTEMIS_APP(user_data);
+  GError *error = NULL;
+  
+  RIG *rig = g_task_propagate_pointer(G_TASK(result), &error);
+  
+  if (rig) {
+    // Success - store the rig and mark as connected
+    self->rig = rig;
+    self->radio_connected = TRUE;
+    g_debug("Radio connected successfully");
+    
+    // Start monitoring now that we're connected
+    artemis_app_start_connection_monitoring(self);
+  } else {
+    // Failed - log the error but don't block the app
+    g_warning("Radio connection failed: %s", error ? error->message : "Unknown error");
+    g_clear_error(&error);
+    self->rig = NULL;
+    self->radio_connected = FALSE;
+  }
+}
+
 // Radio connection management functions
-static void artemis_app_init_radio_connection(ArtemisApp *self)
+static void artemis_app_init_radio_connection_async(ArtemisApp *self)
 {
   GSettings *settings = artemis_app_get_settings();
   
@@ -107,57 +203,43 @@ static void artemis_app_init_radio_connection(ArtemisApp *self)
     return; // No radio configured
   }
   
-  // Get radio settings
-  gint model_id = g_settings_get_int(settings, "radio-model");
-  g_autofree gchar *device_path = g_settings_get_string(settings, "radio-device");
-  g_autofree gchar *network_host = g_settings_get_string(settings, "radio-network-host");
-  gint network_port = g_settings_get_int(settings, "radio-network-port");
-  gint baud_rate = g_settings_get_int(settings, "radio-baud-rate");
+  // Prepare connection data
+  RadioConnectionData *data = g_new0(RadioConnectionData, 1);
+  data->app = g_object_ref(self);
+  data->model_id = g_settings_get_int(settings, "radio-model");
+  data->connection_type = g_strdup(connection_type);
+  data->device_path = g_settings_get_string(settings, "radio-device");
+  data->network_host = g_settings_get_string(settings, "radio-network-host");
+  data->network_port = g_settings_get_int(settings, "radio-network-port");
+  data->baud_rate = g_settings_get_int(settings, "radio-baud-rate");
   
-  // Initialize rig
-  self->rig = rig_init(model_id);
-  if (!self->rig) {
-    g_warning("Failed to initialize radio model %d", model_id);
-    return;
-  }
+  // Create and run async task
+  GTask *task = g_task_new(self, NULL, on_radio_connection_complete, self);
+  g_task_set_task_data(task, data, (GDestroyNotify)radio_connection_data_free);
+  g_task_run_in_thread(task, radio_connection_thread_func);
+  g_object_unref(task);
   
-  // Configure connection based on type
-  if (g_strcmp0(connection_type, "serial") == 0) {
-    strncpy(self->rig->state.rigport.pathname, device_path, HAMLIB_FILPATHLEN - 1);
-    self->rig->state.rigport.parm.serial.rate = baud_rate;
-  } else if (g_strcmp0(connection_type, "network") == 0) {
-    g_autofree gchar *network_path = g_strdup_printf("%s:%d", network_host, network_port);
-    strncpy(self->rig->state.rigport.pathname, network_path, HAMLIB_FILPATHLEN - 1);
-    self->rig->state.rigport.type.rig = RIG_PORT_NETWORK;
-  } else if (g_strcmp0(connection_type, "usb") == 0) {
-    strncpy(self->rig->state.rigport.pathname, device_path, HAMLIB_FILPATHLEN - 1);
-    self->rig->state.rigport.type.rig = RIG_PORT_USB;
-  }
-  
-  // Try to open connection
-  int result = rig_open(self->rig);
-  if (result == RIG_OK) {
-    self->radio_connected = TRUE;
-    g_debug("Radio connected successfully");
-  } else {
-    g_warning("Failed to connect to radio: %s", rigerror(result));
-    rig_cleanup(self->rig);
-    self->rig = NULL;
-    self->radio_connected = FALSE;
-  }
+  g_debug("Radio connection started in background thread");
 }
 
 static void artemis_app_disconnect_radio(ArtemisApp *self)
 {
   if (self->rig && self->radio_connected) {
-    rig_close(self->rig);
+    // Safely close the rig connection
+    int close_result = rig_close(self->rig);
+    if (close_result != RIG_OK) {
+      g_warning("Error closing radio connection: %s", rigerror(close_result));
+    }
     self->radio_connected = FALSE;
     g_debug("Radio disconnected");
   }
 }
 
-static void artemis_app_reconnect_radio(ArtemisApp *self)
+static void artemis_app_reconnect_radio_async(ArtemisApp *self)
 {
+  // Stop monitoring during reconnection
+  artemis_app_stop_connection_monitoring(self);
+  
   // Disconnect existing connection
   artemis_app_disconnect_radio(self);
   
@@ -167,8 +249,91 @@ static void artemis_app_reconnect_radio(ArtemisApp *self)
     self->rig = NULL;
   }
   
-  // Re-initialize connection
-  artemis_app_init_radio_connection(self);
+  // Re-initialize connection asynchronously
+  artemis_app_init_radio_connection_async(self);
+}
+
+// Periodic radio connection check
+static gboolean radio_connection_check(gpointer user_data)
+{
+  ArtemisApp *self = ARTEMIS_APP(user_data);
+  
+  if (!self->rig || !self->radio_connected) {
+    return G_SOURCE_CONTINUE; // Keep checking
+  }
+  
+  // Test connection with a simple command - with crash protection
+  if (!self->rig) {
+    g_debug("Rig is NULL, skipping connection check");
+    self->radio_connected = FALSE;
+    return G_SOURCE_CONTINUE;
+  }
+  
+  freq_t freq;
+  int result = -1;
+  
+  // Additional validation before calling hamlib
+  if (self->rig->caps == NULL || self->rig->state.comm_state != RIG_OK) {
+    g_warning("Rig is in invalid state, marking as disconnected");
+    self->radio_connected = FALSE;
+    return G_SOURCE_CONTINUE;
+  }
+  
+  result = rig_get_freq(self->rig, RIG_VFO_CURR, &freq);
+  
+  if (result != RIG_OK) {
+    g_warning("Radio connection check failed: %s", rigerror(result));
+    self->radio_connected = FALSE;
+    
+    // Try to reconnect automatically
+    artemis_app_reconnect_radio_async(self);
+  }
+  
+  return G_SOURCE_CONTINUE;
+}
+
+// Settings change monitoring
+static void on_radio_settings_changed(GSettings *settings, gchar *key, gpointer user_data)
+{
+  ArtemisApp *self = ARTEMIS_APP(user_data);
+  
+  // Only reconnect if radio-related settings changed
+  if (g_str_has_prefix(key, "radio-")) {
+    g_debug("Radio settings changed (%s), reconnecting...", key);
+    artemis_app_reconnect_radio_async(self);
+  }
+}
+
+static void artemis_app_start_connection_monitoring(ArtemisApp *self)
+{
+  GSettings *settings = artemis_app_get_settings();
+  
+  // Start periodic connection check (every 30 seconds)
+  if (self->radio_check_source_id == 0) {
+    self->radio_check_source_id = g_timeout_add_seconds(30, radio_connection_check, self);
+  }
+  
+  // Monitor settings changes
+  if (self->settings_changed_handler == 0) {
+    self->settings_changed_handler = g_signal_connect(settings, "changed", 
+                                                      G_CALLBACK(on_radio_settings_changed), self);
+  }
+}
+
+static void artemis_app_stop_connection_monitoring(ArtemisApp *self)
+{
+  // Remove periodic check
+  if (self->radio_check_source_id > 0) {
+    g_source_remove(self->radio_check_source_id);
+    self->radio_check_source_id = 0;
+  }
+  
+  // Remove settings monitoring
+  GSettings *settings = artemis_app_get_settings();
+  if (self->settings_changed_handler > 0) {
+    g_signal_handler_disconnect(settings, self->settings_changed_handler);
+    self->settings_changed_handler = 0;
+  }
 }
 
 static void on_search_changed(ArtemisApp *app, const gchar *search_text, gpointer user_data) {
@@ -192,6 +357,45 @@ static void on_mode_filter_changed(ArtemisApp *app, const gchar *mode, gpointer 
   // Trigger filter refresh
   gtk_filter_changed(view->filter, GTK_FILTER_CHANGE_DIFFERENT);
 }
+
+// Update all spot cards in a flow box to check their pinned state
+static void update_spot_cards_pinned_state_in_flow(GtkFlowBox *flow) {
+  GtkFlowBoxChild *child = gtk_flow_box_get_child_at_index(flow, 0);
+  guint index = 0;
+  
+  while (child) {
+    GtkWidget *card_widget = gtk_flow_box_child_get_child(child);
+    if (ARTEMIS_IS_SPOT_CARD(card_widget)) {
+      spot_card_update_pinned_state(ARTEMIS_SPOT_CARD(card_widget));
+    }
+    
+    index++;
+    child = gtk_flow_box_get_child_at_index(flow, index);
+  }
+}
+
+// Update all spot cards across all band views
+static gboolean artemis_app_update_all_spot_cards_pinned_state(ArtemisApp *self) {
+  if (!self->pages) return G_SOURCE_REMOVE;
+  
+  g_debug("Updating pinned state for all spot cards across %u views", self->pages->len);
+  
+  for (guint i = 0; i < self->pages->len; i++) {
+    BandView *view = g_ptr_array_index(self->pages, i);
+    if (view && view->flow) {
+      update_spot_cards_pinned_state_in_flow(GTK_FLOW_BOX(view->flow));
+      
+      // Also trigger sort refresh
+      GtkSorter *sorter = gtk_sort_list_model_get_sorter(view->sorted);
+      if (sorter) {
+        gtk_sorter_changed(sorter, GTK_SORTER_CHANGE_DIFFERENT);
+      }
+    }
+  }
+  
+  return G_SOURCE_REMOVE; // Remove this idle callback after running once
+}
+
 
 static void on_items_changed(GListModel *m, guint pos, guint removed, guint added, gpointer user_data) {
   band_view_update_empty((BandView*)user_data);
@@ -254,6 +458,52 @@ static gboolean combined_filter_func(gpointer item, gpointer user_data)
   return TRUE;
 }
 
+static gboolean is_spot_pinned(ArtemisSpot *spot, ArtemisApp *app)
+{
+  if (!app->pinned_spot_callsign || !app->pinned_spot_park_ref || app->pinned_spot_frequency_hz == 0) {
+    return FALSE;
+  }
+  
+  const char *callsign = artemis_spot_get_callsign(spot);
+  const char *park_ref = artemis_spot_get_park_ref(spot);
+  guint64 frequency_hz = artemis_spot_get_frequency_hz(spot);
+  
+  gboolean matches = (g_strcmp0(callsign, app->pinned_spot_callsign) == 0 &&
+                     g_strcmp0(park_ref, app->pinned_spot_park_ref) == 0 &&
+                     frequency_hz == app->pinned_spot_frequency_hz);
+  
+  if (matches) {
+    g_debug("Found pinned spot match: %s @ %s (%.0f Hz)", callsign, park_ref, (double)frequency_hz);
+  }
+  
+  return matches;
+}
+
+static int pinned_spot_sort_func(gconstpointer a, gconstpointer b, gpointer user_data)
+{
+  ArtemisSpot *spot_a = ARTEMIS_SPOT((gpointer)a);
+  ArtemisSpot *spot_b = ARTEMIS_SPOT((gpointer)b);
+  
+  // Get the default app
+  ArtemisApp *app = ARTEMIS_APP(g_application_get_default());
+  
+  gboolean a_is_pinned = is_spot_pinned(spot_a, app);
+  gboolean b_is_pinned = is_spot_pinned(spot_b, app);
+  
+  // If spot_a is pinned and spot_b is not, spot_a comes first
+  if (a_is_pinned && !b_is_pinned) {
+    return -1;
+  }
+  
+  // If spot_b is pinned and spot_a is not, spot_b comes first  
+  if (b_is_pinned && !a_is_pinned) {
+    return 1;
+  }
+  
+  // If both are pinned or both are not pinned, maintain original order
+  return 0;
+}
+
 static GtkWidget *create_spotcard_cb(gpointer item, gpointer user_data) {
   return spot_card_new_from_spot(item);
 }
@@ -265,18 +515,24 @@ static BandView *add_band_page(AdwViewStack *stack, GListModel *base, const char
   view->band = band_label;
   view->current_search_text = NULL; // Initialize search text
   view->current_mode_filter = NULL; // Initialize mode filter
+  
+  // Create filter model
   view->filter = GTK_FILTER(gtk_custom_filter_new(combined_filter_func, view, NULL));
   view->filtered = gtk_filter_list_model_new(base, view->filter);
+  
+  // Create sort model on top of filter model
+  GtkSorter *sorter = GTK_SORTER(gtk_custom_sorter_new(pinned_spot_sort_func, view, NULL));
+  view->sorted = gtk_sort_list_model_new(G_LIST_MODEL(view->filtered), sorter);
 
   view->flow = gtk_flow_box_new();
   gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(view->flow), 12);
   gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(view->flow), 12);
   gtk_flow_box_set_selection_mode(GTK_FLOW_BOX(view->flow), GTK_SELECTION_NONE);
-  gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(view->flow), 6);
-  gtk_flow_box_set_homogeneous(GTK_FLOW_BOX(view->flow), TRUE);
+  gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(view->flow), 4);
+  gtk_flow_box_set_homogeneous(GTK_FLOW_BOX(view->flow), FALSE);
   gtk_flow_box_bind_model(
     GTK_FLOW_BOX(view->flow), 
-    G_LIST_MODEL(view->filtered), 
+    G_LIST_MODEL(view->sorted), 
     create_spotcard_cb, 
     NULL, 
     NULL);
@@ -313,7 +569,7 @@ static BandView *add_band_page(AdwViewStack *stack, GListModel *base, const char
 
   if (icon_name) adw_view_stack_page_set_icon_name(page, icon_name);
 
-  g_signal_connect(view->filtered, "items-changed", G_CALLBACK(on_items_changed), view);
+  g_signal_connect(view->sorted, "items-changed", G_CALLBACK(on_items_changed), view);
   g_signal_connect(app, "search-changed", G_CALLBACK(on_search_changed), view);
   g_signal_connect(app, "mode-filter-changed", G_CALLBACK(on_mode_filter_changed), view);
   band_view_update_empty(view);
@@ -351,6 +607,9 @@ static void on_repo_refreshed(ArtemisSpotRepo *repo, guint n, gpointer user_data
   adw_toast_set_title(toast, title);
   adw_toast_set_timeout(toast, 5);
   adw_toast_overlay_add_toast(self->toast_overlay, toast);
+  
+  // Reapply pinned styles after refresh since we have new spot objects
+  artemis_app_update_all_spot_cards_pinned_state(self); // Call directly, not as idle callback
 }
 
 static void on_repo_error(ArtemisSpotRepo *repo, GError *error, gpointer user_data)
@@ -427,7 +686,9 @@ static void spot_submitted_callback(GObject *src,
 
   GError *error = NULL;
   JsonNode *node = pota_client_post_spot_finish(client, result, &error);
-
+  gchar *s = json_to_string(node, TRUE);   // TRUE = pretty-print
+  g_print("%s\n", s);
+  g_free(s);
   const gchar *message = NULL;
 
   if (error != NULL) {
@@ -442,24 +703,42 @@ static void spot_submitted_callback(GObject *src,
 
   if (JSON_NODE_HOLDS_ARRAY(node)) {
     JsonArray *arr = json_node_get_array(node);
-    if (json_array_get_length(arr) == 1)
-    {    
-      ArtemisSpot *spot = artemis_spot_new_from_json(json_array_get_object_element(arr, 0));
-      if (spot == NULL) {
-        message = _("Invalid spot payload.");
-        goto alert;
+    guint array_length = json_array_get_length(arr);
+    
+    if (array_length >= 1) {
+      // Get user's callsign from preferences to identify their spot
+      GSettings *settings = artemis_app_get_settings();
+      g_autofree gchar *user_callsign = g_settings_get_string(settings, "callsign");
+      
+      ArtemisSpot *user_spot = NULL;
+      
+      // Iterate through all spots to find the one submitted by the user
+      for (guint i = 0; i < array_length; i++) {
+        ArtemisSpot *spot = artemis_spot_new_from_json(json_array_get_object_element(arr, i));
+        if (spot == NULL) {
+          continue; // Skip invalid spots
+        }
+        
+        const char *spotter = artemis_spot_get_spotter(spot);
+        if (spotter && user_callsign && g_strcmp0(spotter, user_callsign) == 0) {
+          // Found the user's spot
+          user_spot = spot;
+          break;
+        }
+        
+        g_object_unref(spot);
       }
 
       sqlite3_int64 qso_id = 0;
       GError *db_err = NULL;
-      if (!spot_db_add_qso_from_spot(spot_db_get_instance(), spot, &qso_id, &db_err)) {
+      if (!spot_db_add_qso_from_spot(spot_db_get_instance(), user_spot, &qso_id, &db_err)) {
         message = db_err && db_err->message ? db_err->message : _("Failed to write QSO to database.");
         g_clear_error(&db_err);
-        g_object_unref(spot);
+        g_object_unref(user_spot);
         goto alert;
       }
 
-      g_object_unref(spot);
+      g_object_unref(user_spot);
       if (node) json_node_unref(node);
 
       artemis_spot_repo_update_spots(self->repo, 60);
@@ -489,13 +768,38 @@ alert:
 
 static void on_spot_submitted(ArtemisApp *app, ArtemisSpot *spot, gpointer user_data)
 {
+  ArtemisApp *self = ARTEMIS_APP(app);
+  
+  // Clear pinned spot when user submits a spot (re-spots)
+  g_clear_pointer(&self->pinned_spot_callsign, g_free);
+  g_clear_pointer(&self->pinned_spot_park_ref, g_free);
+  self->pinned_spot_frequency_hz = 0;
+  
+  // Update visual state on the next idle cycle to ensure all signal handlers have run
+  g_idle_add((GSourceFunc)artemis_app_update_all_spot_cards_pinned_state, self);
+  
   PotaClient *client = artemis_spot_repo_get_pota_client(app->repo);
   pota_client_post_spot_async(client, spot, NULL, spot_submitted_callback, app);
 }
 
-static void on_tune_frequency(ArtemisApp *app, guint64 frequency_khz, gpointer user_data)
+static void on_tune_frequency(ArtemisApp *app, guint64 frequency_khz, ArtemisSpot *spot, gpointer user_data)
 {
   ArtemisApp *self = ARTEMIS_APP(user_data);
+  
+  // Set this spot as pinned by storing its identifying information
+  g_clear_pointer(&self->pinned_spot_callsign, g_free);
+  g_clear_pointer(&self->pinned_spot_park_ref, g_free);
+  
+  self->pinned_spot_callsign = g_strdup(artemis_spot_get_callsign(spot));
+  self->pinned_spot_park_ref = g_strdup(artemis_spot_get_park_ref(spot));
+  self->pinned_spot_frequency_hz = artemis_spot_get_frequency_hz(spot);
+  
+  g_debug("Pinned spot set: %s @ %s (%.0f Hz)", 
+          self->pinned_spot_callsign, self->pinned_spot_park_ref, 
+          (double)self->pinned_spot_frequency_hz);
+  
+  // Update visual state on the next idle cycle to ensure all signal handlers have run
+  g_idle_add((GSourceFunc)artemis_app_update_all_spot_cards_pinned_state, self);
   
   // Check if radio is connected
   if (!self->rig || !self->radio_connected) {
@@ -507,9 +811,22 @@ static void on_tune_frequency(ArtemisApp *app, guint64 frequency_khz, gpointer u
     return;
   }
   
-  // Set frequency using the persistent connection
+  // Set frequency using the persistent connection with crash protection
   freq_t freq_hz = (freq_t)(frequency_khz * 1000); // Convert MHz to Hz
-  int set_result = rig_set_freq(self->rig, RIG_VFO_CURR, freq_hz);
+  int set_result = -1;
+  
+  // Additional validation before calling hamlib
+  if (!self->rig || self->rig->caps == NULL) {
+    g_warning("Rig is NULL or has invalid caps, cannot set frequency");
+    // Show error dialog
+    AdwDialog *alert = adw_alert_dialog_new(_("Radio Error"), _("Radio is not properly initialized. Please check your radio settings."));
+    adw_alert_dialog_add_response(ADW_ALERT_DIALOG(alert), "ok", _("OK"));
+    adw_alert_dialog_set_default_response(ADW_ALERT_DIALOG(alert), "ok");
+    adw_dialog_present(alert, GTK_WIDGET(self->window));
+    return;
+  }
+  
+  set_result = rig_set_freq(self->rig, RIG_VFO_CURR, freq_hz);
   
   if (set_result == RIG_OK) {
     // Success - show toast
@@ -519,9 +836,9 @@ static void on_tune_frequency(ArtemisApp *app, guint64 frequency_khz, gpointer u
   } else {
     // Error setting frequency - try to reconnect and retry once
     g_warning("Radio frequency setting failed: %s, attempting reconnect", rigerror(set_result));
-    artemis_app_reconnect_radio(self);
+    artemis_app_reconnect_radio_async(self);
     
-    if (self->rig && self->radio_connected) {
+    if (self->rig && self->radio_connected && self->rig->caps) {
       set_result = rig_set_freq(self->rig, RIG_VFO_CURR, freq_hz);
       if (set_result == RIG_OK) {
         g_autofree gchar *msg = g_strdup_printf("Tuned radio to %.3f MHz (after reconnect)", frequency_khz / 1000.0f);
@@ -585,8 +902,8 @@ static void artemis_app_class_init(ArtemisAppClass *klass)
     NULL, NULL,
     NULL,
     G_TYPE_NONE,
-    1,
-    G_TYPE_UINT64
+    2,
+    G_TYPE_UINT64, ARTEMIS_TYPE_SPOT
   );
 }
 
@@ -761,7 +1078,7 @@ GtkWindow *artemis_app_build_ui(ArtemisApp *self, GtkApplication *app) {
   g_signal_connect(app, "tune-frequency", G_CALLBACK(on_tune_frequency), self);
 
   // Initialize radio connection if configured
-  artemis_app_init_radio_connection(self);
+  artemis_app_init_radio_connection_async(self);
 
   return win;
 }
@@ -816,18 +1133,32 @@ static void artemis_app_dispose(GObject *object) {
     self->time_source_id = 0;
   }
 
-  // Cleanup radio connection
+  // Stop radio connection monitoring
+  artemis_app_stop_connection_monitoring(self);
+
+  // Cleanup radio connection with crash protection
   if (self->rig) {
     if (self->radio_connected) {
-      rig_close(self->rig);
+      int close_result = rig_close(self->rig);
+      if (close_result != RIG_OK) {
+        g_warning("Error closing radio during cleanup: %s", rigerror(close_result));
+      }
     }
-    rig_cleanup(self->rig);
+    
+    // Safely cleanup the rig
+    int cleanup_result = rig_cleanup(self->rig);
+    if (cleanup_result != RIG_OK) {
+      g_warning("Error during rig cleanup: %s", rigerror(cleanup_result));
+    }
+    
     self->rig = NULL;
   }
   self->radio_connected = FALSE;
 
   g_clear_pointer(&self->search_text, g_free);
   g_clear_pointer(&self->current_mode_filter, g_free);
+  g_clear_pointer(&self->pinned_spot_callsign, g_free);
+  g_clear_pointer(&self->pinned_spot_park_ref, g_free);
   g_ptr_array_unref(self->pages);
   
   // Cleanup singleton instances
@@ -853,6 +1184,15 @@ static void artemis_app_init(ArtemisApp* self)
   self->seconds_to_update = g_settings_get_int(settings, "update-interval");
 
   self->repo = artemis_spot_repo_new();
+  
+  // Initialize radio monitoring fields
+  self->radio_check_source_id = 0;
+  self->settings_changed_handler = 0;
+  
+  // Initialize pinned spot
+  self->pinned_spot_callsign = NULL;
+  self->pinned_spot_park_ref = NULL;
+  self->pinned_spot_frequency_hz = 0;
 
   g_action_map_add_action_entries (G_ACTION_MAP(self),
                                   app_actions,
@@ -901,7 +1241,36 @@ void artemis_app_emit_mode_filter_changed(ArtemisApp *app, const gchar *mode)
   g_signal_emit(app, app_signals[SIGNAL_MODE_FILTER_CHANGED], 0, mode);
 }
 
-void artemis_app_emit_tune_frequency(ArtemisApp *app, guint64 frequency_khz)
+void artemis_app_emit_tune_frequency(ArtemisApp *app, guint64 frequency_khz, ArtemisSpot *spot)
 {
-  g_signal_emit(app, app_signals[SIGNAL_TUNE_FREQUENCY], 0, frequency_khz);
+  g_signal_emit(app, app_signals[SIGNAL_TUNE_FREQUENCY], 0, frequency_khz, spot);
+}
+
+ArtemisSpot *artemis_app_get_pinned_spot(ArtemisApp *app)
+{
+  g_return_val_if_fail(ARTEMIS_IS_APP(app), NULL);
+  
+  if (!app->pinned_spot_callsign || !app->pinned_spot_park_ref || app->pinned_spot_frequency_hz == 0) {
+    return NULL;
+  }
+  
+  // Search through the spot model to find the matching spot
+  GListModel *model = artemis_spot_repo_get_model(app->repo);
+  guint n_items = g_list_model_get_n_items(model);
+  
+  for (guint i = 0; i < n_items; i++) {
+    ArtemisSpot *spot = g_list_model_get_item(model, i);
+    if (is_spot_pinned(spot, app)) {
+      return spot; // Caller takes ownership
+    }
+    g_object_unref(spot);
+  }
+  
+  return NULL;
+}
+
+ArtemisSpotRepo *artemis_app_get_spot_repo(ArtemisApp *app)
+{
+  g_return_val_if_fail(ARTEMIS_IS_APP(app), NULL);
+  return app->repo;
 }
