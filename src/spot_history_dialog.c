@@ -1,4 +1,6 @@
 #include "spot_history_dialog.h"
+#include "glib-object.h"
+#include "glib.h"
 #include <glib/gi18n.h>
 #include <json-glib/json-glib.h>
 
@@ -74,7 +76,7 @@ void spot_history_dialog_set_callsign_and_park(SpotHistoryDialog *self,
   self->park_ref = g_strdup(park_ref);
 
   // Update dialog title
-  g_autofree char *title = g_strdup_printf(_("Spot History: %s @ %s"), callsign, park_ref);
+  g_autofree char *title = g_strdup_printf("%s @ %s", callsign, park_ref);
   adw_window_title_set_title(self->title_widget, title);
 }
 
@@ -111,6 +113,11 @@ static GtkWidget *create_spot_row(JsonObject *spot_obj)
                      json_object_get_string_member(spot_obj, "mode") : "";
   const char *spot_time = json_object_has_member(spot_obj, "spotTime") ? 
                           json_object_get_string_member(spot_obj, "spotTime") : "";
+
+  g_autoptr(GTimeZone) utc_tz = g_time_zone_new_utc();
+  g_autoptr(GDateTime) dt = g_date_time_new_from_iso8601(spot_time, utc_tz);
+  g_autofree char *spot_dt = dt ? g_date_time_format(dt, "%x %X UTC") : g_strdup(spot_time);
+
   const char *comments = json_object_has_member(spot_obj, "comments") ? 
                          json_object_get_string_member(spot_obj, "comments") : "";
 
@@ -143,13 +150,13 @@ static GtkWidget *create_spot_row(JsonObject *spot_obj)
   gtk_box_append(GTK_BOX(header_box), freq_label);
 
   // Timestamp label
-  GtkWidget *time_label = gtk_label_new(spot_time);
+  GtkWidget *time_label = gtk_label_new(spot_dt);
   gtk_label_set_xalign(GTK_LABEL(time_label), 1.0);
   gtk_widget_add_css_class(time_label, "caption");
   gtk_box_append(GTK_BOX(header_box), time_label);
 
   // Spotter label
-  g_autofree char *spotter_text = g_strdup_printf("Spotted by %s", spotter);
+  g_autofree char *spotter_text = g_strdup_printf(_("Spotted by %s"), spotter);
   GtkWidget *spotter_label = gtk_label_new(spotter_text);
   gtk_label_set_xalign(GTK_LABEL(spotter_label), 0.0);
   gtk_widget_add_css_class(spotter_label, "caption");

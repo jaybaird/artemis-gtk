@@ -433,7 +433,11 @@ static void pota_client_finalize(GObject *obj)
 {
   PotaClient *self = ARTEMIS_POTA_CLIENT(obj);
   
+  soup_cache_flush(self->session_cache);
+  soup_cache_dump(self->session_cache);
+
   g_clear_object(&self->session);
+  g_clear_object(&self->session_cache);
   g_clear_pointer(&self->auth_header, g_free);
   g_clear_pointer(&self->source, g_free);
   g_clear_pointer(&self->base_url, g_free);
