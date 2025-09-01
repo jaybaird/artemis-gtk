@@ -171,5 +171,30 @@ Adw.PreferencesDialog prefs_dialog {
   Adw.PreferencesPage import_page {
     title: _("Logbook");
     icon-name: "user-bookmarks-symbolic";
+
+    Adw.PreferencesGroup {
+      title: _("Import Logbook");
+      description: _("Hunter log CSV location");
+      
+      Adw.ActionRow import_file_row {
+        title: _("Import file");
+        activatable: true;
+        subtitle: _("Click to select a CSV file to import");
+
+        Image {
+          icon-name: "document-open-symbolic";
+          styles ["dim-label"]
+        }
+      }
+    }
+
+    Adw.PreferencesGroup {
+      title: _("Display Options");
+      
+      Adw.SwitchRow row_highlight_unhunted {
+        title: _("Highlight Unhunted Parks");
+        subtitle: _("Show visual highlighting for parks you haven't hunted before");
+      }
+    }
   }
 }

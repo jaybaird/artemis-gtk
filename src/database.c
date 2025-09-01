@@ -5,8 +5,8 @@
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(SpotDb, spot_db_free)
 
-static void spot_db_init_schema(sqlite3 *db);
-static void sqlite_exec_or_die(sqlite3 *db, const char *sql);
+static gboolean spot_db_init_schema(sqlite3 *db);
+static gboolean sqlite_exec_or_fail(sqlite3 *db, const char *sql);
 
 // Singleton instance
 static SpotDb *g_spot_db_instance = NULL;
@@ -23,14 +23,28 @@ SpotDb* spot_db_new(void)
     g_autofree gchar *db_path = g_build_filename(app_dir, "spots.db", NULL);
 
     int rc = sqlite3_open(db_path, &db->spot_db);
-    if (rc != SQLITE_OK) g_error("Cannot open DB at %s: %s", db_path, sqlite3_errmsg(db->spot_db));
+    if (rc != SQLITE_OK) {
+        g_critical("Cannot open DB at %s: %s", db_path, sqlite3_errmsg(db->spot_db));
+        if (db->spot_db) sqlite3_close(db->spot_db);
+        g_free(db);
+        return NULL;
+    }
 
-    sqlite_exec_or_die(db->spot_db, "PRAGMA journal_mode=WAL;");
-    sqlite_exec_or_die(db->spot_db, "PRAGMA synchronous=NORMAL;");
-    sqlite_exec_or_die(db->spot_db, "PRAGMA foreign_keys=ON;");
+    if (!sqlite_exec_or_fail(db->spot_db, "PRAGMA journal_mode=WAL;") ||
+        !sqlite_exec_or_fail(db->spot_db, "PRAGMA synchronous=NORMAL;") ||
+        !sqlite_exec_or_fail(db->spot_db, "PRAGMA foreign_keys=ON;")) {
+        sqlite3_close(db->spot_db);
+        g_free(db);
+        return NULL;
+    }
     sqlite3_busy_timeout(db->spot_db, 3000);
 
-    spot_db_init_schema(db->spot_db);
+    if (!spot_db_init_schema(db->spot_db)) {
+        sqlite3_close(db->spot_db);
+        g_free(db);
+        return NULL;
+    }
+
     g_message("DB opened: %s", db_path);
     return db;
 }
@@ -43,7 +57,7 @@ void spot_db_free(SpotDb* db)
 }
 
 /* Ensure tables/triggers exist */
-static void spot_db_init_schema(sqlite3 *db)
+static gboolean spot_db_init_schema(sqlite3 *db)
 {
     const char *schema[] = {
         "CREATE TABLE IF NOT EXISTS parks ("
@@ -95,8 +109,12 @@ static void spot_db_init_schema(sqlite3 *db)
         "END;"
     };
 
-    for (gsize i = 0; i < G_N_ELEMENTS(schema); ++i)
-        sqlite_exec_or_die(db, schema[i]);
+    for (gsize i = 0; i < G_N_ELEMENTS(schema); ++i) {
+        if (!sqlite_exec_or_fail(db, schema[i])) {
+            return FALSE;
+        }
+    }
+    return TRUE;
 }
 
 // helper: format a borrowed GDateTime* as ISO8601 Z (allocates; caller frees)
@@ -215,14 +233,71 @@ sqlite_fail:
   }
 }
 
+gboolean spot_db_add_park(SpotDb *db, const char *reference, const char *park_name,
+                          const char *dx_entity, const char *location, const char *hasc,
+                          gint qso_count, GError **error) {
+  g_return_val_if_fail(db && db->spot_db && reference && *reference, FALSE);
+
+  const char *sql = 
+    "INSERT OR REPLACE INTO parks(reference, park_name, dx_entity, location, hasc, qso_count) "
+    "VALUES(?, ?, ?, ?, ?, ?);";
+
+  sqlite3_stmt *st = NULL;
+  int rc = sqlite3_prepare_v2(db->spot_db, sql, -1, &st, NULL);
+  if (rc != SQLITE_OK) {
+    g_set_error(error, G_IO_ERROR, rc, "Failed to prepare park insert: %s", sqlite3_errmsg(db->spot_db));
+    return FALSE;
+  }
+
+  sqlite3_bind_text(st, 1, reference, -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(st, 2, park_name ? park_name : "", -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(st, 3, dx_entity ? dx_entity : "", -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(st, 4, location ? location : "", -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(st, 5, hasc ? hasc : "", -1, SQLITE_TRANSIENT);
+  sqlite3_bind_int(st, 6, qso_count >= 0 ? qso_count : 0);
+
+  rc = sqlite3_step(st);
+  sqlite3_finalize(st);
+  
+  if (rc != SQLITE_DONE) {
+    g_set_error(error, G_IO_ERROR, rc, "Failed to insert park: %s", sqlite3_errmsg(db->spot_db));
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
+gboolean spot_db_is_park_hunted(SpotDb *db, const char *park_reference) {
+  g_return_val_if_fail(db && db->spot_db && park_reference && *park_reference, FALSE);
+
+  const char *sql = "SELECT qso_count FROM parks WHERE reference = ? AND qso_count > 0;";
+
+  sqlite3_stmt *st = NULL;
+  int rc = sqlite3_prepare_v2(db->spot_db, sql, -1, &st, NULL);
+  if (rc != SQLITE_OK) {
+    g_warning("Failed to prepare park hunt check: %s", sqlite3_errmsg(db->spot_db));
+    return FALSE;
+  }
+
+  sqlite3_bind_text(st, 1, park_reference, -1, SQLITE_TRANSIENT);
+
+  rc = sqlite3_step(st);
+  gboolean hunted = (rc == SQLITE_ROW);
+
+  sqlite3_finalize(st);
+  return hunted;
+}
+
 /* Helpers */
-static void sqlite_exec_or_die(sqlite3 *db, const char *sql)
+static gboolean sqlite_exec_or_fail(sqlite3 *db, const char *sql)
 {
     char *err=NULL; int rc = sqlite3_exec(db, sql, NULL, NULL, &err);
     if (rc != SQLITE_OK) {
-        g_error("SQL error running '%s': %s", sql, err?err:"(unknown)");
-        sqlite3_free(err);
+        g_critical("SQL error running '%s': %s", sql, err?err:"(unknown)");
+        if (err) sqlite3_free(err);
+        return FALSE;
     }
+    return TRUE;
 }
 
 // ... includes and existing code ...
@@ -455,6 +530,9 @@ SpotDb* spot_db_get_instance(void)
     
     if (!g_spot_db_instance) {
         g_spot_db_instance = spot_db_new();
+        if (!g_spot_db_instance) {
+            g_critical("Failed to initialize database - database operations will not work");
+        }
     }
     
     g_mutex_unlock(&g_spot_db_mutex);

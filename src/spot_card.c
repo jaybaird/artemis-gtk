@@ -435,6 +435,25 @@ GtkWidget *spot_card_new_from_spot(gpointer user_data)
     gtk_widget_add_css_class(GTK_WIDGET(card), "dimmed");
   }
 
+  // Check if this park has never been hunted and highlight it
+  GSettings *settings = artemis_app_get_settings();
+  gboolean highlight_enabled = g_settings_get_boolean(settings, "highlight-unhunted-parks");
+  
+  if (highlight_enabled && !spot_db_is_park_hunted(db, park_ref)) {
+    // Find the inner box with card and frame classes for CSS targeting
+    GtkWidget *child = gtk_widget_get_first_child(GTK_WIDGET(card));
+    while (child) {
+      if (GTK_IS_BOX(child) && 
+          gtk_widget_has_css_class(child, "card") && 
+          gtk_widget_has_css_class(child, "frame")) {
+        gtk_widget_add_css_class(child, "unhunted");
+        g_debug("Added 'unhunted' CSS class to spot card for %s @ %s", callsign, park_ref);
+        break;
+      }
+      child = gtk_widget_get_next_sibling(child);
+    }
+  }
+
   // Check if activator is QRT and apply dimmed styling
   const char *activator_comment = g_utf8_strup(artemis_spot_get_activator_comment(spot), -1);
   if (activator_comment && g_strstr_len(activator_comment, -1, "QRT")) {

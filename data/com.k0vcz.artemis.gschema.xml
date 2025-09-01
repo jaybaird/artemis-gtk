@@ -111,5 +111,11 @@
         <summary>Serial baud rate</summary>
         <description>Baud rate for serial connection.</description>
         </key>
+
+        <key name="highlight-unhunted-parks" type="b">
+        <default>true</default>
+        <summary>Highlight unhunted parks</summary>
+        <description>Highlight spot cards for parks you haven't hunted before.</description>
+        </key>
 	</schema>
 </schemalist>

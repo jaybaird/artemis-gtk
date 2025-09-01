@@ -161,7 +161,7 @@ void pota_client_post_spot_async(PotaClient *self,
 
   SoupMessageHeaders *hdr = soup_message_get_request_headers(msg);
   soup_message_headers_replace(hdr, "Accept", "application/json");
-  soup_message_headers_replace(hdr, "User-Agent", "Artemis/1.0 (+POTA client)");
+  soup_message_headers_replace(hdr, "User-Agent", self->source);
   if (self->auth_header && *self->auth_header)
   {    
     soup_message_headers_replace(hdr, "Authorization", self->auth_header);
@@ -235,7 +235,7 @@ void pota_client_get_spots_async(PotaClient *self,
 
   SoupMessageHeaders *hdr = soup_message_get_request_headers(msg);
   soup_message_headers_replace(hdr, "Accept", "application/json");
-  soup_message_headers_replace(hdr, "User-Agent", "Artemis/1.0 (+POTA client)");
+  soup_message_headers_replace(hdr, "User-Agent", self->source);
   if (self->auth_header && *self->auth_header)
   {
     soup_message_headers_replace(hdr, "Authorization", self->auth_header);
@@ -314,7 +314,7 @@ void pota_client_get_activator_async(PotaClient *self,
 
   SoupMessageHeaders *hdr = soup_message_get_request_headers(msg);
   soup_message_headers_replace(hdr, "Accept", "application/json");
-  soup_message_headers_replace(hdr, "User-Agent", "Artemis/1.0 (+POTA client)");
+  soup_message_headers_replace(hdr, "User-Agent", self->source);
   if (self->auth_header && *self->auth_header)
   {
     soup_message_headers_replace(hdr, "Authorization", self->auth_header);
@@ -406,7 +406,7 @@ void pota_client_get_spot_history_async(PotaClient *self,
 
   SoupMessageHeaders *hdr = soup_message_get_request_headers(msg);
   soup_message_headers_replace(hdr, "Accept", "application/json");
-  soup_message_headers_replace(hdr, "User-Agent", "Artemis/1.0 (+POTA client)");
+  soup_message_headers_replace(hdr, "User-Agent", self->source);
   if (self->auth_header && *self->auth_header)
   {
     soup_message_headers_replace(hdr, "Authorization", self->auth_header);
@@ -433,8 +433,8 @@ static void pota_client_finalize(GObject *obj)
 {
   PotaClient *self = ARTEMIS_POTA_CLIENT(obj);
   
-  soup_cache_flush(self->session_cache);
-  soup_cache_dump(self->session_cache);
+  //soup_cache_flush(self->session_cache);
+  //soup_cache_dump(self->session_cache);
 
   g_clear_object(&self->session);
   g_clear_object(&self->session_cache);
@@ -453,7 +453,10 @@ static void pota_client_class_init(PotaClientClass *klass)
 
 static void pota_client_init(PotaClient *self)
 {
-  self->session = soup_session_new();
+  self->session = soup_session_new_with_options(
+    "timeout", 30,
+    "idle-timeout", 15
+    , NULL);
 
   const gchar *data_dir = g_get_user_data_dir();
   g_autofree gchar *app_dir = g_build_filename(data_dir, "com.k0vcz.artemis", NULL);
@@ -461,11 +464,10 @@ static void pota_client_init(PotaClient *self)
   g_autofree gchar *cache_path = g_build_filename(app_dir, "libsoup.cache", NULL);
   self->session_cache = soup_cache_new(cache_path, SOUP_CACHE_SINGLE_USER);
 
-  soup_session_add_feature(self->session, SOUP_SESSION_FEATURE(self->session_cache));
+  //soup_session_add_feature(self->session, SOUP_SESSION_FEATURE(self->session_cache));
 
-  self->source = g_strdup("Artemis/1.0");
+  self->source = g_strdup("Mozilla/5.0");
   self->base_url = g_strdup("https://api.pota.app");
-  g_object_set(self->session, "timeout", 30, "idle-timeout", 15, NULL);
 }
 
 PotaClient *pota_client_new()

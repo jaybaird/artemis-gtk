@@ -396,7 +396,6 @@ static gboolean artemis_app_update_all_spot_cards_pinned_state(ArtemisApp *self)
   return G_SOURCE_REMOVE; // Remove this idle callback after running once
 }
 
-
 static void on_items_changed(GListModel *m, guint pos, guint removed, guint added, gpointer user_data) {
   band_view_update_empty((BandView*)user_data);
 }

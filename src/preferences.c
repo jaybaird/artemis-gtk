@@ -1,4 +1,5 @@
 #include "preferences.h"
+#include "adwaita.h"
 #include "artemis.h"
 #include "gio/gio.h"
 #include "glib-object.h"
@@ -6,9 +7,14 @@
 #include <math.h>
 #include <hamlib/rig.h>
 
+#include "glib.h"
 #include "glibconfig.h"
+#include "gtk/gtk.h"
+#include "gtk/gtkshortcut.h"
 #include "utils.h"
 #include "radio_models.h"
+#include "artemis.h"
+#include "database.h"
 
 typedef struct {
   const char *const *items;
@@ -59,6 +65,13 @@ typedef struct {
   GtkWidget *parent_dialog;
   GSettings *settings;
 } RadioTestData;
+
+typedef struct {
+  AdwActionRow  *import_action_row;
+  GtkFileDialog *file_dialog;
+  GtkWidget     *import_button;
+  char          *selected_file_path;
+} ImportLogbookData;
 
 typedef struct {
   GtkWidget *serial_settings_group;
@@ -213,17 +226,33 @@ static GVariant *index_to_radio_model(const GValue *in_prop, const GVariantType 
   return g_variant_new_int32(RADIO_MODELS[idx].model_id);
 }
 
-static void radio_test_data_free(RadioTestData *data) {
+static void radio_test_data_free(RadioTestData *data) 
+{
   if (data) {
     g_free(data);
   }
 }
 
-static void connection_type_data_free(ConnectionTypeData *data) {
+static void import_data_free(ImportLogbookData *data)
+{
+  if (data)
+  {
+    if (data->file_dialog) {
+      g_object_unref(data->file_dialog);
+    }
+    g_free(data->selected_file_path);
+    g_free(data);
+  }
+}
+
+static void connection_type_data_free(ConnectionTypeData *data) 
+{
   if (data) {
     g_free(data);
   }
 }
+
+static void on_import_button_clicked(GtkButton *button, gpointer user_data);
 
 static void on_connection_type_changed(AdwComboRow *row, GParamSpec *pspec, gpointer user_data) {
   ConnectionTypeData *data = (ConnectionTypeData *)user_data;
@@ -250,6 +279,161 @@ gboolean spot_preferences_is_configured()
   return is_set && (callsign && *callsign);
 }
 
+static void on_file_dialog_complete(GObject *source_object,
+                                    GAsyncResult *result,
+                                    gpointer user_data)
+{
+    GtkFileDialog *dialog = GTK_FILE_DIALOG(source_object);
+    ImportLogbookData *logbook_data = (ImportLogbookData *)user_data;
+    GError *error = NULL;
+
+    GFile *file = gtk_file_dialog_open_finish(dialog, result, &error);
+    
+    if (error) {
+        if (!g_error_matches(error, GTK_DIALOG_ERROR, GTK_DIALOG_ERROR_CANCELLED)) {
+            g_warning("Error selecting file: %s", error->message);
+        }
+        g_error_free(error);
+        return;
+    }
+
+    char *selected_file_path = g_file_get_path(file);
+    char *basename = g_file_get_basename(file);
+    
+    // Store the selected file path for import
+    g_free(logbook_data->selected_file_path);
+    logbook_data->selected_file_path = g_strdup(selected_file_path);
+    
+    // Update the action row title and subtitle to show selected file
+    adw_preferences_row_set_title(ADW_PREFERENCES_ROW(logbook_data->import_action_row), basename);
+    adw_action_row_set_subtitle(logbook_data->import_action_row, selected_file_path);
+    
+    // Create and configure import button if it doesn't exist
+    if (!logbook_data->import_button) {
+        logbook_data->import_button = gtk_button_new_with_label("Import");
+        gtk_widget_add_css_class(logbook_data->import_button, "suggested-action");
+        gtk_widget_set_valign(logbook_data->import_button, GTK_ALIGN_CENTER);
+        g_signal_connect(logbook_data->import_button, "clicked", 
+                        G_CALLBACK(on_import_button_clicked), logbook_data);
+        
+        // Add the button as a suffix widget instead of activatable widget
+        adw_action_row_add_suffix(logbook_data->import_action_row, logbook_data->import_button);
+    }
+    
+    // Make the button visible
+    gtk_widget_set_visible(logbook_data->import_button, TRUE);
+
+    g_free(basename);
+    g_free(selected_file_path);
+    g_object_unref(file);
+}
+
+static void on_import_button_clicked(GtkButton *button, gpointer user_data)
+{
+  ImportLogbookData *data = (ImportLogbookData *)user_data;
+  
+  if (!data->selected_file_path) {
+    g_warning("No file selected for import");
+    return;
+  }
+  
+  // Create a file object from the stored path
+  GFile *file = g_file_new_for_path(data->selected_file_path);
+  GError *error = NULL;
+  
+  // Read the file contents
+  gchar *contents = NULL;
+  gsize length = 0;
+  gboolean success = g_file_load_contents(file, NULL, &contents, &length, NULL, &error);
+  
+  if (!success || error) {
+    g_warning("Failed to read import file '%s': %s", 
+              data->selected_file_path, 
+              error ? error->message : "Unknown error");
+    if (error) g_error_free(error);
+    g_object_unref(file);
+    return;
+  }
+  
+  g_print("Successfully read %zu bytes from %s\n", length, data->selected_file_path);
+  
+  // Parse CSV and import parks
+  SpotDb *db = spot_db_get_instance();
+  if (!db) {
+    g_warning("Failed to get database instance for import");
+    g_free(contents);
+    g_object_unref(file);
+    adw_action_row_set_subtitle(data->import_action_row, "Import failed: Database error");
+    return;
+  }
+  
+  gchar **lines = g_strsplit(contents, "\n", -1);
+  guint imported_count = 0;
+  guint error_count = 0;
+  
+  for (guint i = 0; lines[i] != NULL; i++) {
+    gchar *line = g_strstrip(lines[i]);
+    if (!line || *line == '\0' || *line == '#') {
+      continue; // Skip empty lines and comments
+    }
+    
+    // Split CSV line by commas
+    gchar **fields = g_strsplit(line, ",", -1);
+    gint field_count = g_strv_length(fields);
+    
+    // Expect at least reference field, optionally: reference,name,dx_entity,location,hasc,qso_count
+    if (field_count >= 1) {
+      const char *reference = g_strstrip(fields[0]);
+      const char *park_name = (field_count > 1) ? g_strstrip(fields[1]) : NULL;
+      const char *dx_entity = (field_count > 2) ? g_strstrip(fields[2]) : NULL;
+      const char *location = (field_count > 3) ? g_strstrip(fields[3]) : NULL;
+      const char *hasc = (field_count > 4) ? g_strstrip(fields[4]) : NULL;
+      
+      gint qso_count = 0;
+      if (field_count > 5) {
+        const char *qso_count_str = g_strstrip(fields[5]);
+        if (qso_count_str && *qso_count_str) {
+          qso_count = (gint)g_ascii_strtoll(qso_count_str, NULL, 10);
+          if (qso_count < 0) qso_count = 0;  // Ensure non-negative
+        }
+      }
+      
+      if (reference && *reference) {
+        GError *db_error = NULL;
+        if (spot_db_add_park(db, reference, park_name, dx_entity, location, hasc, qso_count, &db_error)) {
+          imported_count++;
+          g_print("Imported park: %s (QSOs: %d)\n", reference, qso_count);
+        } else {
+          error_count++;
+          g_warning("Failed to import park %s: %s", reference, 
+                   db_error ? db_error->message : "Unknown error");
+          if (db_error) g_error_free(db_error);
+        }
+      }
+    }
+    
+    g_strfreev(fields);
+  }
+  
+  g_strfreev(lines);
+  g_free(contents);
+  g_object_unref(file);
+  
+  // Update UI with import results
+  g_autofree gchar *result_msg = g_strdup_printf("Imported %u parks, %u errors", 
+                                                 imported_count, error_count);
+  adw_action_row_set_subtitle(data->import_action_row, result_msg);
+  
+  g_print("Import completed: %s\n", result_msg);
+}
+
+static void on_import_file_activated(AdwActionRow *action_row, gpointer userdata)
+{
+  ImportLogbookData *import_data = (ImportLogbookData *)userdata;
+  gtk_file_dialog_open(import_data->file_dialog, 
+    gtk_application_get_active_window(GTK_APPLICATION(g_application_get_default())), NULL, on_file_dialog_complete, import_data);
+}
+
 void show_preferences_dialog(GtkWidget *parent)
 {
   GSettings *settings = artemis_app_get_settings();
@@ -263,6 +447,9 @@ void show_preferences_dialog(GtkWidget *parent)
   AdwEntryRow *row_location  = ADW_ENTRY_ROW(gtk_builder_get_object(b, "row_location"));
   AdwEntryRow *row_spot_msg  = ADW_ENTRY_ROW(gtk_builder_get_object(b, "row_spot_message"));
   AdwEntryRow *row_qrz_key   = ADW_ENTRY_ROW(gtk_builder_get_object(b, "row_qrz_api_key"));
+  
+  // Logbook preferences
+  AdwSwitchRow *row_highlight_unhunted = ADW_SWITCH_ROW(gtk_builder_get_object(b, "row_highlight_unhunted"));
 
   // Radio settings widgets
   AdwComboRow *row_connection_type = ADW_COMBO_ROW(gtk_builder_get_object(b, "row_connection_type"));
@@ -280,6 +467,30 @@ void show_preferences_dialog(GtkWidget *parent)
   // Settings groups for show/hide
   GtkWidget *serial_settings_group   = GTK_WIDGET(gtk_builder_get_object(b, "serial_settings_group"));
   GtkWidget *network_settings_group  = GTK_WIDGET(gtk_builder_get_object(b, "network_settings_group"));
+
+  GtkWidget *import_action_row       = GTK_WIDGET(gtk_builder_get_object(b, "import_file_row"));
+  
+  // Create the file dialog programmatically (not from UI file)
+  GtkFileDialog *file_dialog = gtk_file_dialog_new();
+  
+  GListStore *filters = g_list_store_new(GTK_TYPE_FILE_FILTER);
+
+  GtkFileFilter *csv_filter = gtk_file_filter_new();
+  gtk_file_filter_set_name(csv_filter, "CSV Files");
+  gtk_file_filter_add_pattern(csv_filter, "*.csv");
+  g_list_store_append(filters, csv_filter);
+
+  GtkFileFilter *all_filter = gtk_file_filter_new();
+  gtk_file_filter_set_name(all_filter, "All Files");
+  gtk_file_filter_add_pattern(all_filter, "*");
+  g_list_store_append(filters, all_filter);
+
+  gtk_file_dialog_set_default_filter(file_dialog, csv_filter);
+  gtk_file_dialog_set_filters(file_dialog, G_LIST_MODEL(filters));
+
+  GFile *home_directory = g_file_new_for_path(g_get_home_dir());
+  gtk_file_dialog_set_initial_folder(file_dialog, home_directory);
+  g_object_unref(home_directory);
 
   /* Ensure combo rows display strings from GtkStringList */
   {
@@ -328,6 +539,8 @@ void show_preferences_dialog(GtkWidget *parent)
   g_settings_bind(settings, "location",      row_location, "text", G_SETTINGS_BIND_DEFAULT);
   g_settings_bind(settings, "spot-message",  row_spot_msg, "text", G_SETTINGS_BIND_DEFAULT);
   g_settings_bind(settings, "qrz-api-key",   row_qrz_key,  "text", G_SETTINGS_BIND_DEFAULT);
+  
+  g_settings_bind(settings, "highlight-unhunted-parks", row_highlight_unhunted, "active", G_SETTINGS_BIND_DEFAULT);
 
   /* Radio settings bindings */
   g_settings_bind(settings, "radio-device",       row_device_path,  "text", G_SETTINGS_BIND_DEFAULT);
@@ -388,6 +601,16 @@ void show_preferences_dialog(GtkWidget *parent)
   
   g_signal_connect(test_connection_button, "clicked", G_CALLBACK(on_test_connection_clicked), test_data);
   g_object_set_data_full(G_OBJECT(dlg), "radio-test-data", test_data, (GDestroyNotify)radio_test_data_free);
+
+  
+  ImportLogbookData *logbook_data = g_new0(ImportLogbookData, 1);
+  logbook_data->import_action_row = ADW_ACTION_ROW(import_action_row);
+  logbook_data->file_dialog = g_object_ref(file_dialog);
+  logbook_data->import_button = NULL;
+  logbook_data->selected_file_path = NULL;
+
+  g_signal_connect(import_action_row, "activated", G_CALLBACK(on_import_file_activated), logbook_data);
+  g_object_set_data_full(G_OBJECT(dlg), "import-logbook-data", logbook_data, (GDestroyNotify)import_data_free);
 
   /* Setup connection type change handler */
   ConnectionTypeData *connection_data = g_new0(ConnectionTypeData, 1);

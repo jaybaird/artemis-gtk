@@ -18,6 +18,14 @@ void    spot_db_cleanup_instance(void);
 gboolean spot_db_add_qso_from_spot(SpotDb *db, ArtemisSpot *spot,
                                    sqlite3_int64 *out_qso_id, GError **error);
 
+// Add park to parks table
+gboolean spot_db_add_park(SpotDb *db, const char *reference, const char *park_name,
+                          const char *dx_entity, const char *location, const char *hasc,
+                          gint qso_count, GError **error);
+
+// Check if park has been hunted (has QSO count > 0)
+gboolean spot_db_is_park_hunted(SpotDb *db, const char *park_reference);
+
 // Row representation for a QSO result
 typedef struct {
     sqlite3_int64 id;

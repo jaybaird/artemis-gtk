@@ -52,3 +52,13 @@ box.pinned.card.frame {
 box.pinned.card.frame:hover {
     border-color: @accent_bg_color;
 }
+
+/* Unhunted park highlighting */
+box.unhunted.card.frame {
+    background-color: @warning_bg_color;
+    border-left: 4px solid @warning_color;
+}
+
+box.unhunted.card.frame:hover {
+    background-color: @warning_bg_color;
+}
