@@ -181,11 +181,11 @@ Adw.PreferencesDialog prefs_dialog {
     }
 
     Adw.PreferencesGroup logbook_logging_group {
-      title: _("Logbook Logging");
-      description: _("Configure automatic logging to online logbooks");
+      title: _("External Logging");
+      description: _("Configure logging to online logbooks");
 
       Adw.SwitchRow row_enable_logging {
-        title: _("Enable Automatic Logging");
+        title: _("Enable Logging");
         subtitle: _("Automatically log QSOs to configured logbooks when spotting");
       }
 
@@ -201,6 +201,28 @@ Adw.PreferencesDialog prefs_dialog {
       Adw.SwitchRow row_highlight_unhunted {
         title: _("Highlight Unhunted Parks");
         subtitle: _("Show visual highlighting for parks you haven't hunted before");
+      }
+
+      Adw.SwitchRow row_hide_qrt {
+        title: _("Hide QRT");
+        subtitle: _("Hide stations that have marked themselves QRT");
+      }
+
+      Adw.SwitchRow row_hide_hunted {
+        title: _("Hide Parks Hunted Today");
+        subtitle: _("Hide parks you've already hunted today");
+      }
+
+      Adw.SpinRow row_hide_older_than {
+        title: _("Hide parks with an update older than");
+        digits: 0;
+        climb-rate: 5.0;
+        adjustment: Adjustment {
+            step-increment: 5;
+            lower: 20;
+            upper: 60;
+            value: 30;
+        };
       }
     }
   }

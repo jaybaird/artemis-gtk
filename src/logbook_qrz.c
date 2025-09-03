@@ -1,5 +1,8 @@
 // logbook_qrz.c - QRZ logbook provider implementation
 #include "logbook_qrz.h"
+#include "glib.h"
+#include "artemis.h"
+#include "glibconfig.h"
 #include <libsoup/soup.h>
 #include <json-glib/json-glib.h>
 
@@ -198,7 +201,7 @@ logbook_qrz_log_qso_async(LogbookProvider *provider,
     log_task->qso->comment = g_strdup(qso->comment);
     
     // Format frequency in MHz
-    gdouble freq_mhz = qso->frequency_hz / 1000000.0;
+    gdouble freq_mhz = qso->frequency_hz / 1000.0;
     
     // Format date/time
     g_autofree gchar *qso_date = NULL;
@@ -222,15 +225,22 @@ logbook_qrz_log_qso_async(LogbookProvider *provider,
     
     // Create QRZ API request
     g_autoptr(SoupMessage) msg = soup_message_new("POST", "https://logbook.qrz.com/api");
+    SoupMessageHeaders *hdr = soup_message_get_request_headers(msg);
+    g_autofree gchar *user_agent = g_strdup_printf("Artemis/%d.%d.%d", 
+                                VERSION_MAJOR(APP_VERSION),
+                                VERSION_MINOR(APP_VERSION),
+                                VERSION_PATCH(APP_VERSION));
+    soup_message_headers_replace(hdr, "User-Agent", user_agent);
     
     // Build form data
     GString *form_data = g_string_new(NULL);
+    g_autofree gchar *freq_str = g_strdup_printf("%.4f", freq_mhz);
     g_string_append_printf(form_data, "KEY=%s", self->api_key);
     g_string_append_printf(form_data, "&ACTION=INSERT");
     g_string_append_printf(form_data, "&ADIF=<call:%ld>%s", strlen(qso->callsign), qso->callsign);
     g_string_append_printf(form_data, "<qso_date:8>%s", qso_date);
     g_string_append_printf(form_data, "<time_on:4>%s", qso_time);
-    g_string_append_printf(form_data, "<freq:%.6f>%.6f", freq_mhz, freq_mhz);
+    g_string_append_printf(form_data, "<freq:%ld>%s", strlen(freq_str), freq_str);
     g_string_append_printf(form_data, "<mode:%ld>%s", strlen(qso->mode), qso->mode);
     
     if (qso->rst_sent && strlen(qso->rst_sent) > 0) {
