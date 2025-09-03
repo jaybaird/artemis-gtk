@@ -209,12 +209,14 @@ Adw.PreferencesDialog prefs_dialog {
       }
 
       Adw.SwitchRow row_hide_hunted {
-        title: _("Hide Parks Hunted Today");
+        title: _("Hide Hunted");
         subtitle: _("Hide parks you've already hunted today");
       }
 
       Adw.SpinRow row_hide_older_than {
-        title: _("Hide parks with an update older than");
+        title: _("Hide Stale");
+        subtitle: _("Hide parks that haven't had an update this many minutes");
+        
         digits: 0;
         climb-rate: 5.0;
         adjustment: Adjustment {

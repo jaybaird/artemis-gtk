@@ -2,6 +2,7 @@
 #include "gio/gio.h"
 #include "glib-object.h"
 #include "glib.h"
+#include "artemis.h"
 #include "libsoup/soup-cache.h"
 #include "libsoup/soup-session.h"
 #include "spot.h"
@@ -433,8 +434,8 @@ static void pota_client_finalize(GObject *obj)
 {
   PotaClient *self = ARTEMIS_POTA_CLIENT(obj);
   
-  //soup_cache_flush(self->session_cache);
-  //soup_cache_dump(self->session_cache);
+  soup_cache_flush(self->session_cache);
+  soup_cache_dump(self->session_cache);
 
   g_clear_object(&self->session);
   g_clear_object(&self->session_cache);
@@ -461,12 +462,14 @@ static void pota_client_init(PotaClient *self)
   const gchar *data_dir = g_get_user_data_dir();
   g_autofree gchar *app_dir = g_build_filename(data_dir, "com.k0vcz.artemis", NULL);
   g_mkdir_with_parents(app_dir, 0700);
-  g_autofree gchar *cache_path = g_build_filename(app_dir, "libsoup.cache", NULL);
+  g_autofree gchar *cache_path = g_build_filename(app_dir, "pota_spots.cache", NULL);
   self->session_cache = soup_cache_new(cache_path, SOUP_CACHE_SINGLE_USER);
 
-  //soup_session_add_feature(self->session, SOUP_SESSION_FEATURE(self->session_cache));
-
-  self->source = g_strdup("Mozilla/5.0");
+  soup_session_add_feature(self->session, SOUP_SESSION_FEATURE(self->session_cache));
+  self->source = g_strdup_printf("Artemis/%d.%d.%d", 
+                                VERSION_MAJOR(APP_VERSION),
+                                VERSION_MINOR(APP_VERSION),
+                                VERSION_PATCH(APP_VERSION));
   self->base_url = g_strdup("https://api.pota.app");
 }
 

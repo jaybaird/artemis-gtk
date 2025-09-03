@@ -562,11 +562,10 @@ static BandView *add_band_page(AdwViewStack *stack, GListModel *base, const char
   view->empty = status_page_new();
   status_page_set_icon_name(view->empty, icon_name);
 
-  status_page_set_title(view->empty,
-                          view->band ? g_strdup_printf(_("No %s spots"), view->band) : _("No spots"));
+  status_page_set_title(view->empty, _("Nothing Heard"));
   status_page_set_description(view->empty,
-                          view->band ? g_strdup_printf(_("There are no current spots on %s."), view->band)
-                                   : _("There are no current spots"));
+                          view->band ? g_strdup_printf(_("There are no spots currently on %s."), view->band)
+                                   : _("There are no spots"));
 
   gtk_widget_set_visible(GTK_WIDGET(view->empty), FALSE);
   
@@ -1100,11 +1099,15 @@ artemis_app_about_action(GSimpleAction *action,
 {
   ArtemisApp *self = user_data;
   GtkWindow *window = gtk_application_get_active_window (GTK_APPLICATION (self));
-
+  static const char *developers[] = {NULL};
   adw_show_about_dialog(GTK_WIDGET(window),
                          "application-name", "Artemis — POTA Hunter",
                          "application-icon", APPLICATION_ID,
-                         "developer-name", "Jay Baird",
+                         "website", "https://github.com/jaybaird/artemis-gtk",
+                         "issue-url", "https://github.com/jaybaird/artemis-gtk/issues",
+                         "license-type", GTK_LICENSE_GPL_3_0,
+                         "developer-name", "Jay Baird (K0VCZ)",
+                         "developers", developers,
                          "version", g_strdup_printf("%d.%d.%d", 
                                 VERSION_MAJOR(APP_VERSION),
                                 VERSION_MINOR(APP_VERSION),

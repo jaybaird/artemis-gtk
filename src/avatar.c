@@ -47,9 +47,17 @@ static void on_gravatar_loaded(GObject *source, GAsyncResult *result, gpointer u
 
 // Global session for Gravatar requests
 static SoupSession *gravatar_session = NULL;
+static SoupCache *gravatar_cache = NULL;
 
 static SoupSession *get_gravatar_session(void) {
   if (!gravatar_session) {
+    const gchar *data_dir = g_get_user_data_dir();
+    g_autofree gchar *app_dir = g_build_filename(data_dir, "com.k0vcz.artemis", NULL);
+    g_mkdir_with_parents(app_dir, 0700);
+    g_autofree gchar *cache_path = g_build_filename(app_dir, "gravatar.cache", NULL);
+    gravatar_cache = soup_cache_new(cache_path, SOUP_CACHE_SINGLE_USER);
+
+    soup_session_add_feature(gravatar_session, SOUP_SESSION_FEATURE(gravatar_cache));
     gravatar_session = soup_session_new();
   }
   return gravatar_session;
