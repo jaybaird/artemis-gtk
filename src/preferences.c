@@ -371,7 +371,8 @@ static void on_import_button_clicked(GtkButton *button, gpointer user_data)
   guint imported_count = 0;
   guint error_count = 0;
   
-  for (guint i = 0; lines[i] != NULL; i++) {
+  // skip the first line
+  for (guint i = 1; lines[i] != NULL; i++) {
     gchar *line = g_strstrip(lines[i]);
     if (!line || *line == '\0' || *line == '#') {
       continue; // Skip empty lines and comments
@@ -383,15 +384,15 @@ static void on_import_button_clicked(GtkButton *button, gpointer user_data)
     
     // Expect at least reference field, optionally: reference,name,dx_entity,location,hasc,qso_count
     if (field_count >= 1) {
-      const char *reference = g_strstrip(fields[0]);
-      const char *park_name = (field_count > 1) ? g_strstrip(fields[1]) : NULL;
-      const char *dx_entity = (field_count > 2) ? g_strstrip(fields[2]) : NULL;
-      const char *location = (field_count > 3) ? g_strstrip(fields[3]) : NULL;
-      const char *hasc = (field_count > 4) ? g_strstrip(fields[4]) : NULL;
+      const char *dx_entity = g_strstrip(fields[0]);
+      const char *location = (field_count > 1) ? g_strstrip(fields[1]) : NULL;
+      const char *hasc = (field_count > 2) ? g_strstrip(fields[2]) : NULL;
+      const char *reference = (field_count > 3) ? g_strstrip(fields[3]) : NULL;
+      const char *park_name = (field_count > 4) ? g_strstrip(fields[4]) : NULL;
       
       gint qso_count = 0;
       if (field_count > 5) {
-        const char *qso_count_str = g_strstrip(fields[5]);
+        const char *qso_count_str = g_strstrip(fields[6]);
         if (qso_count_str && *qso_count_str) {
           qso_count = (gint)g_ascii_strtoll(qso_count_str, NULL, 10);
           if (qso_count < 0) qso_count = 0;  // Ensure non-negative
@@ -449,6 +450,7 @@ void show_preferences_dialog(GtkWidget *parent)
   AdwEntryRow *row_qrz_key   = ADW_ENTRY_ROW(gtk_builder_get_object(b, "row_qrz_api_key"));
   
   // Logbook preferences
+  AdwSwitchRow *row_enable_logging     = ADW_SWITCH_ROW(gtk_builder_get_object(b, "row_enable_logging"));
   AdwSwitchRow *row_highlight_unhunted = ADW_SWITCH_ROW(gtk_builder_get_object(b, "row_highlight_unhunted"));
 
   // Radio settings widgets
@@ -540,6 +542,7 @@ void show_preferences_dialog(GtkWidget *parent)
   g_settings_bind(settings, "spot-message",  row_spot_msg, "text", G_SETTINGS_BIND_DEFAULT);
   g_settings_bind(settings, "qrz-api-key",   row_qrz_key,  "text", G_SETTINGS_BIND_DEFAULT);
   
+  g_settings_bind(settings, "enable-logging",           row_enable_logging,     "active", G_SETTINGS_BIND_DEFAULT);
   g_settings_bind(settings, "highlight-unhunted-parks", row_highlight_unhunted, "active", G_SETTINGS_BIND_DEFAULT);
 
   /* Radio settings bindings */

@@ -29,7 +29,8 @@ Adw.Dialog spot_page {
         }
 
         Adw.EntryRow frequency {
-          title: _("Frequency (Hz)");
+          title: _("Frequency (kHz)");
+          text: "14280";
         }
 
         Adw.ComboRow mode {
@@ -39,6 +40,16 @@ Adw.Dialog spot_page {
 
         Adw.EntryRow park_ref {
           title: _("Park Reference");
+        }
+
+        Adw.EntryRow rst_sent {
+          title: _("RST Sent");
+          text: "59";
+        }
+
+        Adw.EntryRow rst_received {
+          title: _("RST Received");
+          text: "59";
         }
 
         Adw.EntryRow spotter_comments {

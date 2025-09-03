@@ -2,8 +2,8 @@ using Gtk 4.0;
 using Adw 1;
 
 Window window {
-  default-width: 1024;
-  default-height: 768;
+  default-width: 1152;
+  default-height: 648;
   title: _("Artemis");
 
   [titlebar]
@@ -46,90 +46,12 @@ Window window {
 
     styles ["toolbar"]
 
-    Box {
-      margin-top: 25;
-      halign: center;
-      hexpand: true;
-      orientation: horizontal;
-
-      SearchEntry search_entry {
-        width-request: 300;
-        input-hints: no_spellcheck;
-        placeholder-text: _("Search for Park or Callsign");
-      }
-
-      Separator {
-        styles ["spacer"]
-      }
-
-      DropDown search_select {
-        model: StringList {
-          strings [
-            _("All"),
-            _("SSB"),
-            _("FM"),
-            _("AM"),
-            _("CW"),
-            _("FT8"),
-            _("FT4"),
-            _("Data"),
-            _("Phone")
-          ]
-        };
-      }
-
-      Separator {
-        styles ["spacer"]
-      }
-
-      Box {
-        orientation: horizontal;
-
-        Label {
-          label: _("Hide QRT");
-        }
-
-        Switch hide_qrt {
-          state-set => $on_hide_qrt_changed();
-          margin-start: 5;
-          state: false;
-        }
-      }
-      
-      Separator {
-        styles ["spacer"]
-      }
-
-      Box {
-        orientation: horizontal;
-
-        Label {
-          label: _("Hide Hunted");
-        }
-
-        Switch hide_hunted {
-          state-set => $on_hide_hunted_changed();
-          margin-start: 5;
-          state: false;
-        }
-      }
-
-      Separator {
-        styles ["spacer"]
-      }
-
-      Label current_time {
-        styles ["monospace", "utc-time"]
-        label: "18:51:27 UTC";
-      }
-    }
-
     Adw.ToastOverlay toast_overlay {
       Overlay {
         hexpand: true;
         vexpand: true;
         
-        margin-top: 25;
+        margin-top: 15;
 
         child: 
           Box root {
@@ -144,6 +66,48 @@ Window window {
               margin-top: 15;
               hexpand: true;
               vexpand: true;
+            }
+
+            Box {
+              margin-top: 25;
+              halign: center;
+              hexpand: true;
+              orientation: horizontal;
+
+              SearchEntry search_entry {
+                width-request: 300;
+                input-hints: no_spellcheck;
+                placeholder-text: _("Search for Park or Callsign");
+              }
+
+              Separator {
+                styles ["spacer"]
+              }
+
+              DropDown search_select {
+                model: StringList {
+                  strings [
+                    _("All"),
+                    _("SSB"),
+                    _("FM"),
+                    _("AM"),
+                    _("CW"),
+                    _("FT8"),
+                    _("FT4"),
+                    _("Data"),
+                    _("Phone")
+                  ]
+                };
+              }
+
+              Separator {
+                styles ["spacer"]
+              }
+
+              Label current_time {
+                styles ["monospace", "utc-time"]
+                label: "18:51:27 UTC";
+              }
             }
           };
 

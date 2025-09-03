@@ -39,7 +39,10 @@ void artemis_app_emit_spot_submitted(ArtemisApp *app, ArtemisSpot *spot);
 void artemis_app_emit_search_changed(ArtemisApp *app, const gchar *search_text);
 void artemis_app_emit_mode_filter_changed(ArtemisApp *app, const gchar *mode);
 void artemis_app_emit_tune_frequency(ArtemisApp *app, guint64 frequency_khz, ArtemisSpot *spot);
+
 ArtemisSpot *artemis_app_get_pinned_spot(ArtemisApp *app);
 struct _ArtemisSpotRepo *artemis_app_get_spot_repo(ArtemisApp *app);
+
+gboolean artemis_app_is_rig_connected(ArtemisApp *app);
 
 G_END_DECLS

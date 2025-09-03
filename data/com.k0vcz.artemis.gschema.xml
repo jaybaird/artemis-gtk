@@ -117,5 +117,11 @@
         <summary>Highlight unhunted parks</summary>
         <description>Highlight spot cards for parks you haven't hunted before.</description>
         </key>
+
+        <key name="enable-logging" type="b">
+        <default>false</default>
+        <summary>Enable automatic logging</summary>
+        <description>Automatically log QSOs to configured logbooks when spotting.</description>
+        </key>
 	</schema>
 </schemalist>

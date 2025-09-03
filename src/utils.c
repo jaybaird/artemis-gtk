@@ -2,6 +2,8 @@
 
 #include <json-glib/json-glib.h>
 
+#define HASH_UNSET  G_MAXUINT
+
 gchar* humanize_ago(GDateTime *t) {
 	if (!t) return g_strdup("unknown");
 
@@ -78,5 +80,21 @@ int gen_aprs_is_passcode(const char *callsign)
 	}
 
 	return (int)(hash & 0x7FFF);
+}
+
+guint hash_spot(ArtemisSpot *spot)
+{
+  const char *callsign = artemis_spot_get_callsign(spot);
+  const char *park_ref = artemis_spot_get_park_ref(spot);
+  int frequency_hz = artemis_spot_get_frequency_hz(spot);
+  const char *mode     = artemis_spot_get_mode(spot);
+  g_autofree char *key = g_strdup_printf("%s|%s|%d|%s", callsign, park_ref, frequency_hz, mode);
+  guint h = g_str_hash(key);
+  if (G_UNLIKELY(h == HASH_UNSET))
+  {
+    h = HASH_UNSET - 1;
+  }
+
+  return h;
 }
 

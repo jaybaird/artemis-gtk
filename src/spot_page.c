@@ -10,6 +10,8 @@
 #include "artemis.h"
 #include "gtk/gtkshortcut.h"
 #include "spot.h"
+#include "logbook.h"
+#include "logbook_qrz.h"
 
 typedef struct {
   GtkBuilder  *builder;
@@ -23,6 +25,23 @@ spot_page_ctx_free(SpotPageContext *ctx)
     g_clear_object(&ctx->builder);
     g_weak_ref_clear(&ctx->spot);
     g_free(ctx);
+}
+
+static void
+qso_logged_callback(GObject *source_object, GAsyncResult *res, gpointer user_data)
+{
+  LogbookProvider *provider = LOGBOOK_PROVIDER(source_object);
+  g_autoptr(GError) error = NULL;
+  
+  gboolean success = logbook_provider_log_qso_finish(provider, res, &error);
+  
+  if (success) {
+    g_debug("QSO logged successfully to %s", logbook_provider_get_name(provider));
+  } else {
+    g_warning("Failed to log QSO to %s: %s", 
+              logbook_provider_get_name(provider), 
+              error ? error->message : "Unknown error");
+  }
 }
 
 static void on_spot_page_cancel(GtkButton *button, gpointer user_data)
@@ -46,6 +65,8 @@ static void on_spot_page_submit(GtkButton *button, gpointer user_data)
   AdwEntryRow *frequency_row            = ADW_ENTRY_ROW(gtk_builder_get_object(ctx->builder, "frequency"));
   AdwEntryRow *park_ref_row             = ADW_ENTRY_ROW(gtk_builder_get_object(ctx->builder, "park_ref"));
   AdwEntryRow *spotter_comments_row     = ADW_ENTRY_ROW(gtk_builder_get_object(ctx->builder, "spotter_comments"));
+  AdwEntryRow *rst_sent_row             = ADW_ENTRY_ROW(gtk_builder_get_object(ctx->builder, "rst_sent"));
+  AdwEntryRow *rst_received_row         = ADW_ENTRY_ROW(gtk_builder_get_object(ctx->builder, "rst_received"));
 
   AdwComboRow *mode_row                 = ADW_COMBO_ROW(gtk_builder_get_object(ctx->builder, "mode"));
 
@@ -54,6 +75,8 @@ static void on_spot_page_submit(GtkButton *button, gpointer user_data)
   const char *freq_str        = gtk_editable_get_text(GTK_EDITABLE(frequency_row));
   const char *park            = gtk_editable_get_text(GTK_EDITABLE(park_ref_row));
   const char *comment         = gtk_editable_get_text(GTK_EDITABLE(spotter_comments_row));
+  const char *rst_sent        = gtk_editable_get_text(GTK_EDITABLE(rst_sent_row));
+  const char *rst_received    = gtk_editable_get_text(GTK_EDITABLE(rst_received_row));
   
   const char *mode = NULL;
   if (mode_row)
@@ -90,6 +113,26 @@ static void on_spot_page_submit(GtkButton *button, gpointer user_data)
 
   ArtemisApp *app = ARTEMIS_APP(g_application_get_default());
   artemis_app_emit_spot_submitted(app, spot);
+  
+  // Check if logbook logging is enabled
+  GSettings *settings = artemis_app_get_settings();
+  gboolean logging_enabled = g_settings_get_boolean(settings, "enable-logging");
+  
+  if (logging_enabled) {
+    // Create QRZ logbook provider
+    g_autoptr(LogbookQrz) qrz_provider = logbook_qrz_new();
+    LogbookProvider *provider = LOGBOOK_PROVIDER(qrz_provider);
+    
+    if (logbook_provider_is_configured(provider)) {
+      // Create QSO data from spot
+      g_autoptr(LogbookQso) qso = logbook_qso_from_spot(spot, rst_sent, rst_received);
+      
+      // Log the QSO
+      logbook_provider_log_qso_async(provider, qso, NULL, qso_logged_callback, NULL);
+    } else {
+      g_debug("QRZ logbook not configured - skipping logging");
+    }
+  }
 
   g_object_unref(spot);
 

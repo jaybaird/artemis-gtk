@@ -44,21 +44,11 @@ banner {
     font-weight: normal;
 }
 
-/* Pinned spot card styling */
-box.pinned.card.frame {
-    border: 2px solid @accent_color;
+.pinned {
+    background-color: color-mix(in srgb, @accent_color 10%, transparent);
+
 }
 
-box.pinned.card.frame:hover {
-    border-color: @accent_bg_color;
-}
-
-/* Unhunted park highlighting */
-box.unhunted.card.frame {
-    background-color: @warning_bg_color;
-    border-left: 4px solid @warning_color;
-}
-
-box.unhunted.card.frame:hover {
-    background-color: @warning_bg_color;
+.unhunted {
+    border: 2px solid var(--accent-green);
 }

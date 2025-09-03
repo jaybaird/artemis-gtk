@@ -67,9 +67,7 @@ struct _ArtemisApp {
   gchar           *current_mode_filter;
   
   // Pinned spot tracking
-  gchar           *pinned_spot_callsign;
-  gchar           *pinned_spot_park_ref;
-  guint64         pinned_spot_frequency_hz;
+  guint           pinned_spot_hash;
 };
 
 typedef struct {
@@ -374,6 +372,21 @@ static void update_spot_cards_pinned_state_in_flow(GtkFlowBox *flow) {
   }
 }
 
+static void update_spot_cards_hunted_state_in_flow(GtkFlowBox *flow) {
+  GtkFlowBoxChild *child = gtk_flow_box_get_child_at_index(flow, 0);
+  guint index = 0;
+  
+  while (child) {
+    GtkWidget *card_widget = gtk_flow_box_child_get_child(child);
+    if (ARTEMIS_IS_SPOT_CARD(card_widget)) {
+      spot_card_update_hunted_state(ARTEMIS_SPOT_CARD(card_widget));
+    }
+    
+    index++;
+    child = gtk_flow_box_get_child_at_index(flow, index);
+  }
+}
+
 // Update all spot cards across all band views
 static gboolean artemis_app_update_all_spot_cards_pinned_state(ArtemisApp *self) {
   if (!self->pages) return G_SOURCE_REMOVE;
@@ -396,8 +409,29 @@ static gboolean artemis_app_update_all_spot_cards_pinned_state(ArtemisApp *self)
   return G_SOURCE_REMOVE; // Remove this idle callback after running once
 }
 
+static gboolean artemis_app_update_all_spot_cards_hunted_state(ArtemisApp *self) {
+  if (!self->pages) return G_SOURCE_REMOVE;
+  
+  g_debug("Updating hunted state for all spot cards across %u views", self->pages->len);
+  
+  for (guint i = 0; i < self->pages->len; i++) {
+    BandView *view = g_ptr_array_index(self->pages, i);
+    if (view && view->flow) {
+      update_spot_cards_hunted_state_in_flow(GTK_FLOW_BOX(view->flow));
+    }
+  }
+  
+  return G_SOURCE_REMOVE; // Remove this idle callback after running once
+}
+
 static void on_items_changed(GListModel *m, guint pos, guint removed, guint added, gpointer user_data) {
   band_view_update_empty((BandView*)user_data);
+}
+
+static void on_highlight_unhunted_parks_changed(GSettings *settings, const gchar *key, gpointer user_data) {
+  ArtemisApp *app = ARTEMIS_APP(user_data);
+  g_debug("Highlight unhunted parks setting changed - refreshing spot cards");
+  g_idle_add((GSourceFunc)artemis_app_update_all_spot_cards_hunted_state, app);
 }
 
 // Search helper function - case insensitive substring search
@@ -459,23 +493,7 @@ static gboolean combined_filter_func(gpointer item, gpointer user_data)
 
 static gboolean is_spot_pinned(ArtemisSpot *spot, ArtemisApp *app)
 {
-  if (!app->pinned_spot_callsign || !app->pinned_spot_park_ref || app->pinned_spot_frequency_hz == 0) {
-    return FALSE;
-  }
-  
-  const char *callsign = artemis_spot_get_callsign(spot);
-  const char *park_ref = artemis_spot_get_park_ref(spot);
-  guint64 frequency_hz = artemis_spot_get_frequency_hz(spot);
-  
-  gboolean matches = (g_strcmp0(callsign, app->pinned_spot_callsign) == 0 &&
-                     g_strcmp0(park_ref, app->pinned_spot_park_ref) == 0 &&
-                     frequency_hz == app->pinned_spot_frequency_hz);
-  
-  if (matches) {
-    g_debug("Found pinned spot match: %s @ %s (%.0f Hz)", callsign, park_ref, (double)frequency_hz);
-  }
-  
-  return matches;
+  return (app->pinned_spot_hash == hash_spot(spot));
 }
 
 static int pinned_spot_sort_func(gconstpointer a, gconstpointer b, gpointer user_data)
@@ -769,10 +787,7 @@ static void on_spot_submitted(ArtemisApp *app, ArtemisSpot *spot, gpointer user_
 {
   ArtemisApp *self = ARTEMIS_APP(app);
   
-  // Clear pinned spot when user submits a spot (re-spots)
-  g_clear_pointer(&self->pinned_spot_callsign, g_free);
-  g_clear_pointer(&self->pinned_spot_park_ref, g_free);
-  self->pinned_spot_frequency_hz = 0;
+  self->pinned_spot_hash = G_MAXUINT;
   
   // Update visual state on the next idle cycle to ensure all signal handlers have run
   g_idle_add((GSourceFunc)artemis_app_update_all_spot_cards_pinned_state, self);
@@ -785,32 +800,28 @@ static void on_tune_frequency(ArtemisApp *app, guint64 frequency_khz, ArtemisSpo
 {
   ArtemisApp *self = ARTEMIS_APP(user_data);
   
-  // Set this spot as pinned by storing its identifying information
-  g_clear_pointer(&self->pinned_spot_callsign, g_free);
-  g_clear_pointer(&self->pinned_spot_park_ref, g_free);
-  
-  self->pinned_spot_callsign = g_strdup(artemis_spot_get_callsign(spot));
-  self->pinned_spot_park_ref = g_strdup(artemis_spot_get_park_ref(spot));
-  self->pinned_spot_frequency_hz = artemis_spot_get_frequency_hz(spot);
-  
-  g_debug("Pinned spot set: %s @ %s (%.0f Hz)", 
-          self->pinned_spot_callsign, self->pinned_spot_park_ref, 
-          (double)self->pinned_spot_frequency_hz);
+  guint spot_hash = hash_spot(spot);
+  if (self->pinned_spot_hash == spot_hash)
+  {
+    self->pinned_spot_hash = G_MAXUINT;
+    g_debug("Pinned spot unset");
+    g_idle_add((GSourceFunc)artemis_app_update_all_spot_cards_pinned_state, self);
+    return; // bail because we want to unset
+  }
+  else 
+  {
+    self->pinned_spot_hash = spot_hash;
+    g_debug("Pinned spot set");
+  }
   
   // Update visual state on the next idle cycle to ensure all signal handlers have run
   g_idle_add((GSourceFunc)artemis_app_update_all_spot_cards_pinned_state, self);
   
-  // Check if radio is connected
+  // Check if radio is connected, if not we updated the pinned state to "track" or reset and now we bail
   if (!self->rig || !self->radio_connected) {
-    AdwAlertDialog *alert = ADW_ALERT_DIALOG(adw_alert_dialog_new("Radio Not Connected", 
-      "Radio is not connected. Please check your radio configuration in Preferences and restart the application."));
-    adw_alert_dialog_add_response(alert, "ok", "OK");
-    adw_alert_dialog_set_default_response(alert, "ok");
-    adw_dialog_present(ADW_DIALOG(alert), GTK_WIDGET(self->window));
     return;
   }
   
-  // Set frequency using the persistent connection with crash protection
   freq_t freq_hz = (freq_t)(frequency_khz * 1000); // Convert MHz to Hz
   int set_result = -1;
   
@@ -1156,8 +1167,7 @@ static void artemis_app_dispose(GObject *object) {
 
   g_clear_pointer(&self->search_text, g_free);
   g_clear_pointer(&self->current_mode_filter, g_free);
-  g_clear_pointer(&self->pinned_spot_callsign, g_free);
-  g_clear_pointer(&self->pinned_spot_park_ref, g_free);
+
   g_ptr_array_unref(self->pages);
   
   // Cleanup singleton instances
@@ -1189,9 +1199,7 @@ static void artemis_app_init(ArtemisApp* self)
   self->settings_changed_handler = 0;
   
   // Initialize pinned spot
-  self->pinned_spot_callsign = NULL;
-  self->pinned_spot_park_ref = NULL;
-  self->pinned_spot_frequency_hz = 0;
+  self->pinned_spot_hash = G_MAXUINT;
 
   g_action_map_add_action_entries (G_ACTION_MAP(self),
                                   app_actions,
@@ -1212,6 +1220,8 @@ static void artemis_app_init(ArtemisApp* self)
 
   g_signal_connect(artemis_app_get_settings(), "changed::update-interval",
                   G_CALLBACK(on_update_interval_changed), self);
+  g_signal_connect(artemis_app_get_settings(), "changed::highlight-unhunted-parks",
+                  G_CALLBACK(on_highlight_unhunted_parks_changed), self);
 }
 
 GSettings *artemis_app_get_settings()
@@ -1249,7 +1259,7 @@ ArtemisSpot *artemis_app_get_pinned_spot(ArtemisApp *app)
 {
   g_return_val_if_fail(ARTEMIS_IS_APP(app), NULL);
   
-  if (!app->pinned_spot_callsign || !app->pinned_spot_park_ref || app->pinned_spot_frequency_hz == 0) {
+  if (app->pinned_spot_hash == G_MAXUINT) {
     return NULL;
   }
   
@@ -1272,4 +1282,9 @@ ArtemisSpotRepo *artemis_app_get_spot_repo(ArtemisApp *app)
 {
   g_return_val_if_fail(ARTEMIS_IS_APP(app), NULL);
   return app->repo;
+}
+
+gboolean artemis_app_is_rig_connected(ArtemisApp *app)
+{
+  return app->rig && app->radio_connected;
 }

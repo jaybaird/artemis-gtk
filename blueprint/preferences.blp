@@ -73,14 +73,6 @@ Adw.PreferencesDialog prefs_dialog {
       }
     }
 
-    Adw.PreferencesGroup apis_group {
-      title: _("APIs");
-
-      /* Mask input but still bind to a plain string setting */
-      Adw.PasswordEntryRow row_qrz_api_key {
-        title: _("QRZ API Key");
-      }
-    }
   }
   Adw.PreferencesPage radio_page {
     title: _("Radio");
@@ -185,6 +177,21 @@ Adw.PreferencesDialog prefs_dialog {
           icon-name: "document-open-symbolic";
           styles ["dim-label"]
         }
+      }
+    }
+
+    Adw.PreferencesGroup logbook_logging_group {
+      title: _("Logbook Logging");
+      description: _("Configure automatic logging to online logbooks");
+
+      Adw.SwitchRow row_enable_logging {
+        title: _("Enable Automatic Logging");
+        subtitle: _("Automatically log QSOs to configured logbooks when spotting");
+      }
+
+      /* Mask input but still bind to a plain string setting */
+      Adw.PasswordEntryRow row_qrz_api_key {
+        title: _("QRZ API Key");
       }
     }
 

@@ -57,7 +57,7 @@ template $SpotCard : Box {
 
       [overlay]
       Image corner_image {
-        tooltip-text: _("Hunted");
+        tooltip-text: _("Hunted today");
         halign: end;
         valign: center;
         margin-end: 10;
@@ -123,6 +123,8 @@ template $SpotCard : Box {
         Label mode {
           valign: baseline;
           label: "FT8";
+          styles ["caption monospace pill"]
+
         }
       }
 
