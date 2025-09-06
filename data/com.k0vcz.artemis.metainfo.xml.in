@@ -1,9 +1,66 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<component type="desktop">
-	<id>com.k0vcz.artemis.desktop</id>
-	<metadata_license>CC0-1.0</metadata_license>
-	<project_license>GPL-3.0-or-later</project_license>
-	<description>
-	  <p>No description</p>
-	</description>
+<component type="desktop-application">
+  <id>@appid@</id>
+	<icon type="stock">@appid@</icon>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+
+  <name>Artemis</name>
+  <summary>A Parks On The Air (POTA) hunters sidekick</summary>
+
+  <keywords>
+    <keyword>POTA</keyword>
+    <keyword>Parks On The Air</keyword>
+    <keyword>ham radio</keyword>
+    <keyword>amateur radio</keyword>
+    <keyword>spotting</keyword>
+    <keyword>spots</keyword>
+    <keyword>activations</keyword>
+    <keyword>park</keyword>
+    <keyword>hunter</keyword>
+    <keyword>chaser</keyword>
+    <keyword>HF</keyword>
+    <keyword>VHF</keyword>
+    <keyword>UHF</keyword>
+  </keywords>
+
+  <translation type="gettext">artemis</translation>
+  <content_rating type="oars-1.0" />
+
+  <description>
+    <p>
+      Artemis is a desktop companion for chasing Parks On The Air (POTA) activations. It focuses exclusively on hunting—surfacing fresh spots and getting you on frequency fast.
+    </p>
+
+    <ul>
+      <li><b>Live spots &amp; fast filters:</b> Quickly slice by band, mode, callsign, or park.</li>
+      <li><b>Rig control &amp; auto-tune:</b> Tune your radio to a selected spot (hamlib/CAT-compatible rigs via <code>rigctld</code> or similar).</li>
+      <li><b>Built-in logging:</b> Capture contact details while you hunt, without leaving the app.</li>
+      <li><b>Unworked park highlighting:</b> Visually flag parks you haven’t hunted yet.</li>
+      <li><b>GNOME/Adwaita UI:</b> Responsive layout, keyboard shortcuts, and dark mode.</li>
+    </ul>
+    <p>
+      Artemis is purpose built for POTA hunters
+    </p>
+  </description>
+
+  <url type="homepage">https://github.com/jaybaird/artemis-gtk</url>
+  <url type="vcs-browser">https://github.com/jaybaird/artemis-gtk</url>
+  <url type="bugtracker">https://github.com/jaybaird/artemis-gtk/issues</url>
+
+  <releases>
+    <release version="1.0.0" date="2025-09-03">
+      <description translate="no">
+        <ul>
+          <li>Initial release</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+
+  <launchable type="desktop-id">@appid@.desktop</launchable>
+
+  <developer id="com.k0vcz">
+    <name translate="no">Jay Baird</name>
+  </developer>
 </component>

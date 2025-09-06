@@ -4,6 +4,8 @@ project('Artemis', 'c',
   default_options: ['c_std=c11', 'buildtype=debug']
 )
 
+app_id = 'com.k0vcz.artemis'
+
 cc = meson.get_compiler('c')
 
 deps = [
@@ -34,6 +36,7 @@ resources = gnome.compile_resources(
 )
 
 gnome.post_install(
+  glib_compile_schemas: true,
   gtk_update_icon_cache: true,
   update_desktop_database: true,
 )
@@ -49,7 +52,7 @@ configure_file(output: 'config.h', configuration: conf)
 
 add_project_arguments('-DHAVE_CONFIG_H', language: 'c')
 
-executable('Artemis',
+executable('artemis',
   sources: [
     'src/main.c',
     'src/artemis.c',
@@ -71,5 +74,6 @@ executable('Artemis',
     resources,
   ],
   dependencies: deps,
+  install: true,
   include_directories: include_directories('src')
 )

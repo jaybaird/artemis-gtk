@@ -1,9 +1,11 @@
-desktop_file = i18n.merge_file(
+data_conf = configuration_data()
+data_conf.set('appid', app_id)
+
+desktop_file = configure_file(
         input: 'com.k0vcz.artemis.desktop.in',
        output: 'com.k0vcz.artemis.desktop',
-         type: 'desktop',
-       po_dir: '../po',
       install: true,
+configuration: data_conf,
   install_dir: get_option('datadir') / 'applications'
 )
 
@@ -12,12 +14,19 @@ if desktop_utils.found()
   test('Validate desktop file', desktop_utils, args: [desktop_file])
 endif
 
+metainfo_tmpl = configure_file(
+  input: 'com.k0vcz.artemis.metainfo.xml.in',
+  output: 'com.k0vcz.artemis.metainfo.xml.in',
+  configuration: data_conf
+)
+
 appstream_file = i18n.merge_file(
-        input: 'com.k0vcz.artemis.metainfo.xml.in',
-       output: 'com.k0vcz.artemis.metainfo.xml',
-       po_dir: '../po',
-      install: true,
-  install_dir: get_option('datadir') / 'metainfo'
+  input: metainfo_tmpl,
+  output: 'com.k0vcz.artemis.metainfo.xml',
+  po_dir: meson.project_source_root() / 'po',
+  install: true,
+  install_dir: get_option('datadir') / 'metainfo',
+  type: 'xml'
 )
 
 appstreamcli = find_program('appstreamcli', required: false, disabler: true)

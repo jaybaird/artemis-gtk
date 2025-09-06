@@ -45,7 +45,26 @@
                 "--disable-static",
                 "--without-cxx-binding",
                 "--disable-winradio",
-                "--without-rpc-backends"
+                "--without-indi",
+                "--without-readline"
+            ],
+            "cleanup": [
+                "/bin/ampctl",
+                "/bin/ampctld",
+                "/bin/rigctl",
+                "/bin/rigctlcom",
+                "/bin/rigctld",
+                "/bin/rigctlsync",
+                "/bin/rigctltcp",
+                "/bin/rigfreqwalk",
+                "/bin/rigmem",
+                "/bin/rigsmtr",
+                "/bin/rigswr",
+                "/bin/rigtestlibusb",
+                "/bin/rigtestmcast",
+                "/bin/rigtestmcastrx",
+                "/bin/rotctl",
+                "/bin/rotctld"
             ],
             "sources": [
                 {
@@ -56,13 +75,12 @@
             ]
         },
         {
-            "name": "artemis",
+            "name": "Artemis",
             "buildsystem": "meson",
             "sources": [
                 {
-                    "type": "git",
-                    "url": "https://github.com/jaybaird/artemis-gtk.git",
-                    "branch": "main"
+                    "type": "dir",
+                    "path": "."
                 }
             ]
         }

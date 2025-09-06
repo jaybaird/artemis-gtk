@@ -1,15 +1,4 @@
 #include "artemis.h"
-#include "adwaita.h"
-#include "gio/gio.h"
-#include "glib-object.h"
-#include "glib.h"
-
-#include "glibconfig.h"
-#include "gtk/gtkdropdown.h"
-#include "json-glib/json-glib.h"
-#include "pota_client.h"
-#include "preferences.h"
-#include "spot_card.h"
 
 #include <gtk/gtk.h>
 #include <libintl.h>
@@ -17,6 +6,9 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "pota_client.h"
+#include "preferences.h"
+#include "spot_card.h"
 #include "utils.h"
 #include "spot.h"
 #include "spot_repo.h"

@@ -156,7 +156,6 @@ artemis_pota_user_cache_set_ttl_default(ArtemisPotaUserCache *self, guint ttl_se
   self->default_ttl_seconds = ttl_seconds;
 }
 
-/* ----------------- Singleton implementation ----------------- */
 ArtemisPotaUserCache *artemis_pota_user_cache_get_instance(void)
 {
   g_mutex_lock(&g_pota_user_cache_mutex);
