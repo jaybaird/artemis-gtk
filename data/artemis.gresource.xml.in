@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gresources>
   <gresource prefix="/com/k0vcz/artemis/data/ui/">
-    <file preprocess="xml-stripblanks" alias="preferences.ui">build/blueprint/preferences.ui</file>
-    <file preprocess="xml-stripblanks" alias="main_window.ui">build/blueprint/main_window.ui</file>
-    <file preprocess="xml-stripblanks" alias="spot_card.ui">build/blueprint/spot_card.ui</file>
-    <file preprocess="xml-stripblanks" alias="status_page.ui">build/blueprint/status_page.ui</file>
-    <file preprocess="xml-stripblanks" alias="spot_page.ui">build/blueprint/spot_page.ui</file>
-    <file preprocess="xml-stripblanks" alias="add_spot_page.ui">build/blueprint/add_spot_page.ui</file>
-    <file preprocess="xml-stripblanks" alias="spot_history_dialog.ui">build/blueprint/spot_history_dialog.ui</file>
+    <file preprocess="xml-stripblanks" alias="preferences.ui">@build_dir@/blueprint/preferences.ui</file>
+    <file preprocess="xml-stripblanks" alias="main_window.ui">@build_dir@/blueprint/main_window.ui</file>
+    <file preprocess="xml-stripblanks" alias="spot_card.ui">@build_dir@/blueprint/spot_card.ui</file>
+    <file preprocess="xml-stripblanks" alias="status_page.ui">@build_dir@/blueprint/status_page.ui</file>
+    <file preprocess="xml-stripblanks" alias="spot_page.ui">@build_dir@/blueprint/spot_page.ui</file>
+    <file preprocess="xml-stripblanks" alias="add_spot_page.ui">@build_dir@/blueprint/add_spot_page.ui</file>
+    <file preprocess="xml-stripblanks" alias="spot_history_dialog.ui">@build_dir@/blueprint/spot_history_dialog.ui</file>
   </gresource>
 
   <gresource prefix="/com/k0vcz/artemis/">
