@@ -7,5 +7,7 @@
 
 #define SCHEMA_ID "com.k0vcz.artemis"
 
-gboolean spot_preferences_is_configured();
-void show_preferences_dialog(GtkWidget *parent);
+gboolean
+spot_preferences_is_configured();
+void
+show_preferences_dialog(GtkWidget *parent);

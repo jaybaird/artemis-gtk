@@ -22,15 +22,18 @@ struct _ArtemisSpot {
 
 G_DEFINE_FINAL_TYPE(ArtemisSpot, artemis_spot, G_TYPE_OBJECT)
 
-static const char *obj_str(JsonObject *o, const char *k) {
+static const char *
+obj_str(JsonObject *o, const char *k) {
   return json_object_has_member(o,k) ? json_object_get_string_member(o,k) : "";
 }
 
-static int obj_int(JsonObject *o, const char *k, int defv) {
+static int
+obj_int(JsonObject *o, const char *k, int defv) {
   return json_object_has_member(o,k) ? (int)json_object_get_int_member(o,k) : defv;
 }
 
-static GDateTime *parse_dt(JsonObject *o) {
+static GDateTime *
+parse_dt(JsonObject *o) {
   const char *iso = obj_str(o, "spotTime");
   if (!iso) return NULL;
   GDateTime *dt = g_date_time_new_from_iso8601(iso, g_time_zone_new_utc());
@@ -38,7 +41,8 @@ static GDateTime *parse_dt(JsonObject *o) {
   return dt;
 }
 
-static void artemis_spot_dispose(GObject *obj) {
+static void
+artemis_spot_dispose(GObject *obj) {
   ArtemisSpot *self = (ArtemisSpot*)obj;
   g_clear_pointer(&self->callsign, g_free);
   g_clear_pointer(&self->park_ref, g_free);
@@ -54,13 +58,16 @@ static void artemis_spot_dispose(GObject *obj) {
   G_OBJECT_CLASS(artemis_spot_parent_class)->dispose(obj);
 }
 
-static void artemis_spot_class_init(ArtemisSpotClass *klass) {
+static void
+artemis_spot_class_init(ArtemisSpotClass *klass) {
   GObjectClass *oc = G_OBJECT_CLASS(klass);
   oc->dispose = artemis_spot_dispose;
 }
-static void artemis_spot_init(ArtemisSpot *self) {}
+static void
+artemis_spot_init(ArtemisSpot *self) {}
 
-ArtemisSpot *artemis_spot_new(const char    *callsign,
+ArtemisSpot *
+artemis_spot_new(const char    *callsign,
                               const char    *park_ref,
                               const char    *park_name,
                               const char    *location_desc,
@@ -89,7 +96,8 @@ ArtemisSpot *artemis_spot_new(const char    *callsign,
   return self;
 }
 
-ArtemisSpot *artemis_spot_new_from_json(JsonObject *o) {
+ArtemisSpot *
+artemis_spot_new_from_json(JsonObject *o) {
   const char *callsign = obj_str(o, "activator");
   const char *park_ref = obj_str(o, "reference");
   const char *park_name = obj_str(o, "name");
@@ -119,26 +127,40 @@ ArtemisSpot *artemis_spot_new_from_json(JsonObject *o) {
 }
 
 /* Getters */
-const char *artemis_spot_get_callsign    (ArtemisSpot *s){ return s->callsign; }
-const char *artemis_spot_get_park_ref    (ArtemisSpot *s){ return s->park_ref; }
-const char *artemis_spot_get_park_name   (ArtemisSpot *s){ return s->park_name; }
-const char *artemis_spot_get_mode        (ArtemisSpot *s){ return s->mode; }
-const char *artemis_spot_get_band        (ArtemisSpot *s){ return s->band; }
-const char *artemis_spot_get_location_desc(ArtemisSpot *s){ return s->location_desc; };
-const char *artemis_spot_get_spotter(ArtemisSpot *s) { return s->spotter; };
-const char *artemis_spot_get_spotter_comment(ArtemisSpot *s) { return s->spotter_comment; };
-const char *artemis_spot_get_activator_comment(ArtemisSpot *s) { return s->activator_comment; };
-int         artemis_spot_get_frequency_hz(ArtemisSpot *s){ return s->frequency_hz; }
-GDateTime  *artemis_spot_get_spot_time (ArtemisSpot *s){ return s->spot_time; }
-int         artemis_spot_get_spot_count  (ArtemisSpot *s){ return s->spot_count; }
+const char *
+artemis_spot_get_callsign    (ArtemisSpot *s){ return s->callsign; }
+const char *
+artemis_spot_get_park_ref    (ArtemisSpot *s){ return s->park_ref; }
+const char *
+artemis_spot_get_park_name   (ArtemisSpot *s){ return s->park_name; }
+const char *
+artemis_spot_get_mode        (ArtemisSpot *s){ return s->mode; }
+const char *
+artemis_spot_get_band        (ArtemisSpot *s){ return s->band; }
+const char *
+artemis_spot_get_location_desc(ArtemisSpot *s){ return s->location_desc; };
+const char *
+artemis_spot_get_spotter(ArtemisSpot *s) { return s->spotter; };
+const char *
+artemis_spot_get_spotter_comment(ArtemisSpot *s) { return s->spotter_comment; };
+const char *
+artemis_spot_get_activator_comment(ArtemisSpot *s) { return s->activator_comment; };
+int
+artemis_spot_get_frequency_hz(ArtemisSpot *s){ return s->frequency_hz; }
+GDateTime  *
+artemis_spot_get_spot_time (ArtemisSpot *s){ return s->spot_time; }
+int
+artemis_spot_get_spot_count  (ArtemisSpot *s){ return s->spot_count; }
 
 
 /* Store helpers */
-GListStore *artemis_spot_store_new(void) {
+GListStore *
+artemis_spot_store_new(void) {
   return g_list_store_new(ARTEMIS_TYPE_SPOT);
 }
 
-void artemis_spot_store_add_json_array(GListStore *store, JsonArray *arr) {
+void
+artemis_spot_store_add_json_array(GListStore *store, JsonArray *arr) {
   g_return_if_fail(G_IS_LIST_STORE(store));
   g_return_if_fail(arr != NULL);
 

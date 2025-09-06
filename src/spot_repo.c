@@ -93,7 +93,8 @@ typedef struct {
   GHashTable *unique_callsigns; // tracks unique callsigns to avoid duplicate requests
 } SpotUpdateData;
 
-static void spot_update_data_free(SpotUpdateData *data) {
+static void
+spot_update_data_free(SpotUpdateData *data) {
   if (data) {
     if (data->unique_callsigns) g_hash_table_unref(data->unique_callsigns);
     g_object_unref(data->repo);
@@ -101,7 +102,8 @@ static void spot_update_data_free(SpotUpdateData *data) {
   }
 }
 
-static void on_user_data_fetched(GObject *source, GAsyncResult *result, gpointer user_data) {
+static void
+on_user_data_fetched(GObject *source, GAsyncResult *result, gpointer user_data) {
   // This callback is fired for each user data fetch (activators and spotters), but we don't need to do much here
   // The user cache handles storing the results
   ArtemisPotaUserCache *cache = ARTEMIS_POTA_USER_CACHE(source);

@@ -44,7 +44,8 @@ struct _LogbookProviderClass {
 };
 
 // Interface methods
-gboolean logbook_provider_is_configured(LogbookProvider *provider);
+gboolean
+logbook_provider_is_configured(LogbookProvider *provider);
 void logbook_provider_log_qso_async(LogbookProvider *provider,
                                    LogbookQso *qso,
                                    GCancellable *cancellable,
@@ -53,12 +54,16 @@ void logbook_provider_log_qso_async(LogbookProvider *provider,
 gboolean logbook_provider_log_qso_finish(LogbookProvider *provider,
                                         GAsyncResult *result,
                                         GError **error);
-const gchar* logbook_provider_get_name(LogbookProvider *provider);
+const gchar*
+logbook_provider_get_name(LogbookProvider *provider);
 
 // QSO data helpers
-LogbookQso* logbook_qso_new(void);
-void logbook_qso_free(LogbookQso *qso);
-LogbookQso* logbook_qso_from_spot(ArtemisSpot *spot, const gchar *rst_sent, const gchar *rst_received);
+LogbookQso*
+logbook_qso_new(void);
+void
+logbook_qso_free(LogbookQso *qso);
+LogbookQso*
+logbook_qso_from_spot(ArtemisSpot *spot, const gchar *rst_sent, const gchar *rst_received);
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(LogbookQso, logbook_qso_free)
 

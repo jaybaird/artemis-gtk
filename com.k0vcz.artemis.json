@@ -1,0 +1,58 @@
+{
+    "app-id": "com.k0vcz.artemis",
+    "runtime": "org.gnome.Platform",
+    "runtime-version": "48",
+    "sdk": "org.gnome.Sdk",
+    "command": "artemis",
+    "finish-args": [
+        "--share=network",
+        "--share=ipc",
+        "--socket=wayland",
+        "--socket=fallback-x11",
+        "--device=all",
+        "--filesystem=home:ro",
+        "--talk-name=org.freedesktop.secrets",
+        "--own-name=com.k0vcz.artemis"
+    ],
+    "cleanup": [
+        "/include",
+        "/lib/pkgconfig",
+        "/man",
+        "/share/doc",
+        "/share/gtk-doc",
+        "/share/man",
+        "/share/pkgconfig",
+        "*.la",
+        "*.a"
+    ],
+    "modules": [
+        {
+            "name": "hamlib",
+            "buildsystem": "autotools",
+            "config-opts": [
+                "--disable-static",
+                "--without-cxx-binding",
+                "--disable-winradio",
+                "--without-rpc-backends"
+            ],
+            "sources": [
+                {
+                    "type": "archive",
+                    "url": "https://github.com/Hamlib/Hamlib/releases/download/4.6.5/hamlib-4.6.5.tar.gz",
+                    "sha256": "90d6f1dba59417c00f8f4545131c7efd31930cd0e178598980a8210425e3852e"
+                }
+            ]
+        },
+        {
+            "name": "artemis",
+            "buildsystem": "meson",
+            "sources": [
+                {
+                    "type": "git",
+                    "url": "https://github.com/jaybaird/artemis-gtk.git",
+                    "branch": "main"
+                }
+            ]
+        }
+    ]
+}

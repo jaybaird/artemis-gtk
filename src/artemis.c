@@ -89,14 +89,16 @@ typedef struct {
   gchar               *current_mode_filter; // cached mode filter for this view
 } BandView;
 
-static void band_view_update_empty(BandView *bv) {
+static void
+band_view_update_empty(BandView *bv) {
   guint n = g_list_model_get_n_items(G_LIST_MODEL(bv->sorted));
 
   gtk_widget_set_visible(GTK_WIDGET(bv->scroller), n > 0);
   gtk_widget_set_visible(GTK_WIDGET(bv->empty), n == 0);
 }
 
-static void band_view_free(BandView *view) {
+static void
+band_view_free(BandView *view) {
   if (view) {
     g_free(view->current_search_text);
     g_free(view->current_mode_filter);
@@ -115,7 +117,8 @@ typedef struct {
   gint baud_rate;
 } RadioConnectionData;
 
-static void radio_connection_data_free(RadioConnectionData *data) {
+static void
+radio_connection_data_free(RadioConnectionData *data) {
   if (data) {
     g_object_unref(data->app);
     g_free(data->connection_type);
@@ -334,7 +337,8 @@ static void artemis_app_stop_connection_monitoring(ArtemisApp *self)
   }
 }
 
-static void on_search_changed(ArtemisApp *app, const gchar *search_text, gpointer user_data) {
+static void
+on_search_changed(ArtemisApp *app, const gchar *search_text, gpointer user_data) {
   BandView *view = (BandView *)user_data;
   
   // Update cached search text
@@ -345,7 +349,8 @@ static void on_search_changed(ArtemisApp *app, const gchar *search_text, gpointe
   gtk_filter_changed(view->filter, GTK_FILTER_CHANGE_DIFFERENT);
 }
 
-static void on_mode_filter_changed(ArtemisApp *app, const gchar *mode, gpointer user_data) {
+static void
+on_mode_filter_changed(ArtemisApp *app, const gchar *mode, gpointer user_data) {
   BandView *view = (BandView *)user_data;
   
   // Update cached mode filter
@@ -357,7 +362,8 @@ static void on_mode_filter_changed(ArtemisApp *app, const gchar *mode, gpointer 
 }
 
 // Update all spot cards in a flow box to check their pinned state
-static void update_spot_cards_pinned_state_in_flow(GtkFlowBox *flow) {
+static void
+update_spot_cards_pinned_state_in_flow(GtkFlowBox *flow) {
   GtkFlowBoxChild *child = gtk_flow_box_get_child_at_index(flow, 0);
   guint index = 0;
   
@@ -372,7 +378,8 @@ static void update_spot_cards_pinned_state_in_flow(GtkFlowBox *flow) {
   }
 }
 
-static void update_spot_cards_hunted_state_in_flow(GtkFlowBox *flow) {
+static void
+update_spot_cards_hunted_state_in_flow(GtkFlowBox *flow) {
   GtkFlowBoxChild *child = gtk_flow_box_get_child_at_index(flow, 0);
   guint index = 0;
   
@@ -388,7 +395,8 @@ static void update_spot_cards_hunted_state_in_flow(GtkFlowBox *flow) {
 }
 
 // Update all spot cards across all band views
-static gboolean artemis_app_update_all_spot_cards_pinned_state(ArtemisApp *self) {
+static gboolean
+artemis_app_update_all_spot_cards_pinned_state(ArtemisApp *self) {
   if (!self->pages) return G_SOURCE_REMOVE;
   
   g_debug("Updating pinned state for all spot cards across %u views", self->pages->len);
@@ -409,7 +417,8 @@ static gboolean artemis_app_update_all_spot_cards_pinned_state(ArtemisApp *self)
   return G_SOURCE_REMOVE; // Remove this idle callback after running once
 }
 
-static gboolean artemis_app_update_all_spot_cards_hunted_state(ArtemisApp *self) {
+static gboolean
+artemis_app_update_all_spot_cards_hunted_state(ArtemisApp *self) {
   if (!self->pages) return G_SOURCE_REMOVE;
   
   g_debug("Updating hunted state for all spot cards across %u views", self->pages->len);
@@ -424,18 +433,21 @@ static gboolean artemis_app_update_all_spot_cards_hunted_state(ArtemisApp *self)
   return G_SOURCE_REMOVE; // Remove this idle callback after running once
 }
 
-static void on_items_changed(GListModel *m, guint pos, guint removed, guint added, gpointer user_data) {
+static void
+on_items_changed(GListModel *m, guint pos, guint removed, guint added, gpointer user_data) {
   band_view_update_empty((BandView*)user_data);
 }
 
-static void on_highlight_unhunted_parks_changed(GSettings *settings, const gchar *key, gpointer user_data) {
+static void
+on_highlight_unhunted_parks_changed(GSettings *settings, const gchar *key, gpointer user_data) {
   ArtemisApp *app = ARTEMIS_APP(user_data);
   g_debug("Highlight unhunted parks setting changed - refreshing spot cards");
   g_idle_add((GSourceFunc)artemis_app_update_all_spot_cards_hunted_state, app);
 }
 
 // Search helper function - case insensitive substring search
-static gboolean contains_text_case_insensitive(const char *haystack, const char *needle) {
+static gboolean
+contains_text_case_insensitive(const char *haystack, const char *needle) {
   if (!haystack || !needle || !*needle) return TRUE;
   if (!*haystack) return FALSE;
   
@@ -593,7 +605,8 @@ static BandView *add_band_page(AdwViewStack *stack, GListModel *base, const char
   return view;
 }
 
-void build_band_stack(AdwViewStack *stack, ArtemisSpotRepo *repo, ArtemisApp *app, GPtrArray **out_pages) {
+void
+build_band_stack(AdwViewStack *stack, ArtemisSpotRepo *repo, ArtemisApp *app, GPtrArray **out_pages) {
   GListModel *base = artemis_spot_repo_get_model(repo); // borrowed
 
   GPtrArray *pages = g_ptr_array_new_with_free_func((GDestroyNotify)band_view_free);
@@ -654,7 +667,8 @@ static void artemis_app_activate(GApplication *app)
   gtk_window_present(self->window);
 }
 
-static void on_search_entry_changed(GtkSearchEntry *entry, gpointer user_data) {
+static void
+on_search_entry_changed(GtkSearchEntry *entry, gpointer user_data) {
   ArtemisApp *app = ARTEMIS_APP(user_data);
   const char *text = gtk_editable_get_text(GTK_EDITABLE(entry));
   
@@ -1024,11 +1038,12 @@ GtkWindow *artemis_app_build_ui(ArtemisApp *self, GtkApplication *app) {
   g_type_ensure(ARTEMIS_TYPE_STATUS_PAGE);
 
   AdwStyleManager *manager = adw_style_manager_get_default();
-  adw_style_manager_set_color_scheme(manager, ADW_COLOR_SCHEME_PREFER_DARK);
+  adw_style_manager_set_color_scheme(manager, ADW_COLOR_SCHEME_DEFAULT);
 
   GtkIconTheme *theme = gtk_icon_theme_get_for_display(gdk_display_get_default());
   gtk_icon_theme_add_resource_path(theme, "/com/k0vcz/artemis/icons/hicolor");
   gtk_icon_theme_add_resource_path(theme, "/com/k0vcz/artemis/icons");
+  gtk_icon_theme_add_resource_path(theme, "/com/k0vcz/artemis");
 
   GtkBuilder *builder = gtk_builder_new();
   GtkBuilderScope *scope = gtk_builder_cscope_new();
@@ -1051,6 +1066,9 @@ GtkWindow *artemis_app_build_ui(ArtemisApp *self, GtkApplication *app) {
   GtkWindow *win = GTK_WINDOW(gtk_builder_get_object(builder, "window"));
   gtk_window_set_application(win, app);
   gtk_window_set_title(win, "Artemis");
+  
+  // Set window icon for development (when running without system installation)
+  gtk_window_set_icon_name(win, APPLICATION_ID);
 
   self->spots_container = GTK_FLOW_BOX(gtk_builder_get_object(builder, "spots_container"));
   self->loading_spinner = GTK_BOX(gtk_builder_get_object(builder, "loading_spinner"));
@@ -1101,7 +1119,7 @@ artemis_app_about_action(GSimpleAction *action,
   GtkWindow *window = gtk_application_get_active_window (GTK_APPLICATION (self));
   static const char *developers[] = {NULL};
   adw_show_about_dialog(GTK_WIDGET(window),
-                         "application-name", "Artemis — POTA Hunter",
+                         "application-name", "Artemis",
                          "application-icon", APPLICATION_ID,
                          "website", "https://github.com/jaybaird/artemis-gtk",
                          "issue-url", "https://github.com/jaybaird/artemis-gtk/issues",
@@ -1112,7 +1130,7 @@ artemis_app_about_action(GSimpleAction *action,
                                 VERSION_MAJOR(APP_VERSION),
                                 VERSION_MINOR(APP_VERSION),
                                 VERSION_PATCH(APP_VERSION)),
-                         "copyright", "© 2025 Jay Baird",
+                         "copyright", "Parks on the Air ® is a registered service mark by the U.S. Patent and Trademark Office.\nSerial Number – 88085306\n1-4805205111 Registered TXu 2-044-081\nU.S. Copyright Office April 5, 2017 by Jason Johnston W3AAX",
                          NULL);
 }
 
@@ -1138,7 +1156,8 @@ static const GActionEntry app_actions[] = {
   {"preferences", artemis_app_preferences_action},
 };
 
-static void artemis_app_dispose(GObject *object) {
+static void
+artemis_app_dispose(GObject *object) {
   ArtemisApp *self = ARTEMIS_APP(object);
 
   if (self->time_source_id) {

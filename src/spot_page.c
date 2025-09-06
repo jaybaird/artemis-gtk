@@ -44,7 +44,8 @@ qso_logged_callback(GObject *source_object, GAsyncResult *res, gpointer user_dat
   }
 }
 
-static void on_spot_page_cancel(GtkButton *button, gpointer user_data)
+static void
+on_spot_page_cancel(GtkButton *button, gpointer user_data)
 {
   GtkWidget *dialog = GTK_WIDGET(user_data);
   if (dialog)
@@ -53,7 +54,8 @@ static void on_spot_page_cancel(GtkButton *button, gpointer user_data)
   }
 }
 
-static void on_spot_page_submit(GtkButton *button, gpointer user_data)
+static void
+on_spot_page_submit(GtkButton *button, gpointer user_data)
 {
   GtkWidget *dialog = GTK_WIDGET(user_data);
   if (!dialog) return;
@@ -139,7 +141,8 @@ static void on_spot_page_submit(GtkButton *button, gpointer user_data)
   adw_dialog_close(ADW_DIALOG(dialog));
 }
 
-void show_add_spot_page(GtkWidget *parent)
+void
+show_add_spot_page(GtkWidget *parent)
 {
   GSettings *settings = artemis_app_get_settings();
   GtkBuilder *b = gtk_builder_new_from_resource("/com/k0vcz/artemis/data/ui/add_spot_page.ui");
@@ -169,7 +172,8 @@ void show_add_spot_page(GtkWidget *parent)
   adw_dialog_present(ADW_DIALOG(dlg), GTK_WIDGET(parent));
 }
 
-void show_spot_page_with_spot(GtkWidget *parent, ArtemisSpot *spot)
+void
+show_spot_page_with_spot(GtkWidget *parent, ArtemisSpot *spot)
 {
   GSettings *settings = artemis_app_get_settings();
   GtkBuilder *b = gtk_builder_new_from_resource("/com/k0vcz/artemis/data/ui/spot_page.ui");

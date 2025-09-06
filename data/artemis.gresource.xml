@@ -38,5 +38,6 @@
     <file preprocess="xml-stripblanks" alias="hicolor/scalable/status/band-10m.svg">data/icons/hicolor/scalable/status/band-10m.svg</file>
     <file preprocess="xml-stripblanks" alias="hicolor/scalable/status/band-6m.svg">data/icons/hicolor/scalable/status/band-6m.svg</file>
     <file preprocess="xml-stripblanks" alias="hicolor/scalable/status/band-2m.svg">data/icons/hicolor/scalable/status/band-2m.svg</file>
+    <file preprocess="xml-stripblanks" alias="hicolor/scalable/status/band-70cm.svg">data/icons/hicolor/scalable/status/band-70cm.svg</file>
   </gresource>
 </gresources>

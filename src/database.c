@@ -17,7 +17,7 @@ SpotDb* spot_db_new(void)
     SpotDb* db = g_new0(SpotDb, 1);
 
     const gchar *data_dir = g_get_user_data_dir();
-    g_autofree gchar *app_dir = g_build_filename(data_dir, "com.k0vcz.artemis", NULL);
+    g_autofree gchar *app_dir = g_build_filename(data_dir, "artemis", NULL);
     g_mkdir_with_parents(app_dir, 0700);
 
     g_autofree gchar *db_path = g_build_filename(app_dir, "spots.db", NULL);
@@ -267,7 +267,8 @@ gboolean spot_db_add_park(SpotDb *db, const char *reference, const char *park_na
   return TRUE;
 }
 
-gboolean spot_db_is_park_hunted(SpotDb *db, const char *park_reference) {
+gboolean
+spot_db_is_park_hunted(SpotDb *db, const char *park_reference) {
   g_return_val_if_fail(db && db->spot_db && park_reference && *park_reference, FALSE);
 
   const char *sql = "SELECT qso_count FROM parks WHERE reference = ? AND qso_count > 0;";
@@ -307,7 +308,8 @@ static gchar* iso8601_day_start(GDateTime *utc_any);
 static gchar* iso8601_next_day_start(GDateTime *utc_any);
 
 /* ----------------- Ownership helpers ----------------- */
-void qso_row_free(QsoRow *row) {
+void
+qso_row_free(QsoRow *row) {
     if (!row) return;
     g_free(row->park_ref);
     g_free(row->callsign);
@@ -319,7 +321,8 @@ void qso_row_free(QsoRow *row) {
     g_free(row);
 }
 
-void qso_row_array_free(GPtrArray *rows) {
+void
+qso_row_array_free(GPtrArray *rows) {
     if (!rows) return;
     for (guint i = 0; i < rows->len; ++i)
         qso_row_free((QsoRow*)rows->pdata[i]);

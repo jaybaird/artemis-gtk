@@ -22,7 +22,8 @@ typedef struct {
 } StringListMap;
 
 /* ---- GSettings mapping helpers ---- */
-static gboolean map_str_to_index (GValue *out_prop, GVariant *in_variant, gpointer user_data) {
+static gboolean
+map_str_to_index (GValue *out_prop, GVariant *in_variant, gpointer user_data) {
   StringListMap *m = user_data;
   const char *s = g_variant_get_string (in_variant, NULL);
   guint idx = 0;
@@ -40,7 +41,8 @@ static GVariant *map_index_to_str (const GValue *in_prop, const GVariantType *ex
   return g_variant_new_string (m->items[idx]);
 }
 
-static gboolean map_i_to_d (GValue *out_prop, GVariant *in_variant, gpointer user_data) {
+static gboolean
+map_i_to_d (GValue *out_prop, GVariant *in_variant, gpointer user_data) {
   g_value_set_double (out_prop, (double) g_variant_get_int32 (in_variant));
   return TRUE;
 }
@@ -79,14 +81,16 @@ typedef struct {
   AdwComboRow *connection_type_row;
 } ConnectionTypeData;
 
-static void show_error_dialog(RadioTestData *data, const char *title, const char *message) {
+static void
+show_error_dialog(RadioTestData *data, const char *title, const char *message) {
   AdwAlertDialog *alert = ADW_ALERT_DIALOG(adw_alert_dialog_new(title, message));
   adw_alert_dialog_add_response(alert, "ok", "OK");
   adw_alert_dialog_set_default_response(alert, "ok");
   adw_dialog_present(ADW_DIALOG(alert), data->parent_dialog);
 }
 
-static void update_connection_status(RadioTestData *data, gboolean connected, const char *message) {
+static void
+update_connection_status(RadioTestData *data, gboolean connected, const char *message) {
   if (connected) {
     gtk_image_set_from_icon_name(GTK_IMAGE(data->connection_status_icon), "emblem-ok-symbolic");
     gtk_widget_add_css_class(data->connection_status_icon, "success");
@@ -103,7 +107,8 @@ static void update_connection_status(RadioTestData *data, gboolean connected, co
   gtk_button_set_label(GTK_BUTTON(data->test_button), "Test Connection");
 }
 
-static void on_test_connection_clicked(GtkButton *button, gpointer user_data) {
+static void
+on_test_connection_clicked(GtkButton *button, gpointer user_data) {
   RadioTestData *data = (RadioTestData *)user_data;
   
   gtk_widget_set_sensitive(data->test_button, FALSE);
@@ -174,7 +179,8 @@ static void on_test_connection_clicked(GtkButton *button, gpointer user_data) {
 }
 
 /* Baud rate mapping functions */
-static gboolean baud_rate_to_index(GValue *out_prop, GVariant *in_variant, gpointer user_data) {
+static gboolean
+baud_rate_to_index(GValue *out_prop, GVariant *in_variant, gpointer user_data) {
   gint baud = g_variant_get_int32(in_variant);
   g_autofree gchar *baud_str = g_strdup_printf("%d", baud);
   guint idx = 0;
@@ -193,7 +199,8 @@ static GVariant *index_to_baud_rate(const GValue *in_prop, const GVariantType *e
 }
 
 /* Connection type mapping functions */
-static gboolean connection_type_to_index(GValue *out_prop, GVariant *in_variant, gpointer user_data) {
+static gboolean
+connection_type_to_index(GValue *out_prop, GVariant *in_variant, gpointer user_data) {
   const char *value = g_variant_get_string(in_variant, NULL);
   guint idx = 0;
   for (guint i = 0; i < G_N_ELEMENTS(CONNECTION_TYPES_VALUES); i++) {
@@ -210,7 +217,8 @@ static GVariant *index_to_connection_type(const GValue *in_prop, const GVariantT
 }
 
 /* Radio model mapping functions */
-static gboolean radio_model_to_index(GValue *out_prop, GVariant *in_variant, gpointer user_data) {
+static gboolean
+radio_model_to_index(GValue *out_prop, GVariant *in_variant, gpointer user_data) {
   gint model_id = g_variant_get_int32(in_variant);
   guint idx = 0;
   for (guint i = 0; i < RADIO_MODELS_COUNT; i++) {
@@ -254,7 +262,8 @@ static void connection_type_data_free(ConnectionTypeData *data)
 
 static void on_import_button_clicked(GtkButton *button, gpointer user_data);
 
-static void on_connection_type_changed(AdwComboRow *row, GParamSpec *pspec, gpointer user_data) {
+static void
+on_connection_type_changed(AdwComboRow *row, GParamSpec *pspec, gpointer user_data) {
   ConnectionTypeData *data = (ConnectionTypeData *)user_data;
   guint selected = adw_combo_row_get_selected(row);
   

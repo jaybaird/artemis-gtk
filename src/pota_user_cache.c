@@ -20,14 +20,16 @@ static GMutex g_pota_user_cache_mutex;
 
 G_DEFINE_FINAL_TYPE(ArtemisPotaUserCache, artemis_pota_user_cache, G_TYPE_OBJECT)
 
-static void pota_user_cache_entry_free(PotaUserCacheEntry *entry) {
+static void
+pota_user_cache_entry_free(PotaUserCacheEntry *entry) {
   if (entry) {
     g_clear_object(&entry->activator);
     g_free(entry);
   }
 }
 
-static void artemis_pota_user_cache_finalize(GObject *object) {
+static void
+artemis_pota_user_cache_finalize(GObject *object) {
   ArtemisPotaUserCache *self = ARTEMIS_POTA_USER_CACHE(object);
   
   g_clear_pointer(&self->cache, g_hash_table_unref);
@@ -36,12 +38,14 @@ static void artemis_pota_user_cache_finalize(GObject *object) {
   G_OBJECT_CLASS(artemis_pota_user_cache_parent_class)->finalize(object);
 }
 
-static void artemis_pota_user_cache_class_init(ArtemisPotaUserCacheClass *klass) {
+static void
+artemis_pota_user_cache_class_init(ArtemisPotaUserCacheClass *klass) {
   GObjectClass *object_class = G_OBJECT_CLASS(klass);
   object_class->finalize = artemis_pota_user_cache_finalize;
 }
 
-static void artemis_pota_user_cache_init(ArtemisPotaUserCache *self) {
+static void
+artemis_pota_user_cache_init(ArtemisPotaUserCache *self) {
   self->cache = g_hash_table_new_full(g_str_hash, g_str_equal, 
                                       g_free, (GDestroyNotify)pota_user_cache_entry_free);
   self->default_ttl_seconds = 3600; // 1 hour default
@@ -55,12 +59,14 @@ ArtemisPotaUserCache *artemis_pota_user_cache_new(PotaClient *client) {
   return self;
 }
 
-static gboolean is_entry_expired(PotaUserCacheEntry *entry) {
+static gboolean
+is_entry_expired(PotaUserCacheEntry *entry) {
   if (!entry) return TRUE;
   return g_get_monotonic_time() > entry->expires_at;
 }
 
-static void get_activator_from_api_cb(GObject *source, GAsyncResult *res, gpointer user_data) {
+static void
+get_activator_from_api_cb(GObject *source, GAsyncResult *res, gpointer user_data) {
   GTask *task = G_TASK(user_data);
   ArtemisPotaUserCache *self = g_task_get_source_object(task);
   PotaClient *client = ARTEMIS_POTA_CLIENT(source);
@@ -138,12 +144,14 @@ ArtemisActivator *artemis_pota_user_cache_get_finish(ArtemisPotaUserCache *self,
   return g_task_propagate_pointer(G_TASK(result), error);
 }
 
-void artemis_pota_user_cache_clear(ArtemisPotaUserCache *self) {
+void
+artemis_pota_user_cache_clear(ArtemisPotaUserCache *self) {
   g_return_if_fail(ARTEMIS_IS_POTA_USER_CACHE(self));
   g_hash_table_remove_all(self->cache);
 }
 
-void artemis_pota_user_cache_set_ttl_default(ArtemisPotaUserCache *self, guint ttl_seconds) {
+void
+artemis_pota_user_cache_set_ttl_default(ArtemisPotaUserCache *self, guint ttl_seconds) {
   g_return_if_fail(ARTEMIS_IS_POTA_USER_CACHE(self));
   self->default_ttl_seconds = ttl_seconds;
 }

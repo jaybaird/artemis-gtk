@@ -1,7 +1,8 @@
 #include "config.h"
 #include "artemis.h"
 
-int main(int argc, char** argv)
+int
+main(int argc, char** argv)
 {
     bindtextdomain(GETTEXT_PACKAGE, LOCALEDIR);
     bind_textdomain_codeset(GETTEXT_PACKAGE, "UTF-8");

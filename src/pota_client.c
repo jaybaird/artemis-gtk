@@ -25,7 +25,8 @@ typedef struct {
     SoupMessage *msg;
 } TaskData;
 
-static void task_data_free(TaskData *d) {
+static void
+task_data_free(TaskData *d) {
     if (!d) return;
     if (d->msg) g_object_unref(d->msg);
     g_free(d);
@@ -84,7 +85,8 @@ JsonNode *build_json_from_spot(PotaClient *self,
   return root;
 }
 
-static void post_spot_cb(GObject *source, GAsyncResult *res, gpointer user_data) {
+static void
+post_spot_cb(GObject *source, GAsyncResult *res, gpointer user_data) {
   GTask       *task = G_TASK(user_data);
   PotaClient  *self = g_task_get_source_object(task);
   TaskData *td  = g_task_get_task_data(task);
@@ -183,7 +185,8 @@ JsonNode *pota_client_post_spot_finish(PotaClient *self, GAsyncResult *res, GErr
   return g_task_propagate_pointer(G_TASK(res), error);
 }
 
-static void get_spots_cb(GObject *source, GAsyncResult *res, gpointer user_data) {
+static void
+get_spots_cb(GObject *source, GAsyncResult *res, gpointer user_data) {
   GTask *task = G_TASK(user_data);
   PotaClient *self = g_task_get_source_object(task);
   TaskData *td = g_task_get_task_data(task);
@@ -259,7 +262,8 @@ JsonNode *pota_client_get_spots_finish(PotaClient *self, GAsyncResult *res, GErr
   return g_task_propagate_pointer(G_TASK(res), error);
 }
 
-static void get_activator_cb(GObject *source, GAsyncResult *res, gpointer user_data) {
+static void
+get_activator_cb(GObject *source, GAsyncResult *res, gpointer user_data) {
   GTask *task = G_TASK(user_data);
   PotaClient *self = g_task_get_source_object(task);
   TaskData *td = g_task_get_task_data(task);
@@ -338,7 +342,8 @@ JsonNode *pota_client_get_activator_finish(PotaClient *self, GAsyncResult *res, 
   return g_task_propagate_pointer(G_TASK(res), error);
 }
 
-static void get_spot_history_cb(GObject *source, GAsyncResult *res, gpointer user_data) {
+static void
+get_spot_history_cb(GObject *source, GAsyncResult *res, gpointer user_data) {
   GTask *task = G_TASK(user_data);
   PotaClient *self = g_task_get_source_object(task);
   TaskData *td = g_task_get_task_data(task);
@@ -460,7 +465,7 @@ static void pota_client_init(PotaClient *self)
     , NULL);
 
   const gchar *data_dir = g_get_user_data_dir();
-  g_autofree gchar *app_dir = g_build_filename(data_dir, "com.k0vcz.artemis", NULL);
+  g_autofree gchar *app_dir = g_build_filename(data_dir, "artemis", NULL);
   g_mkdir_with_parents(app_dir, 0700);
   g_autofree gchar *cache_path = g_build_filename(app_dir, "pota_spots.cache", NULL);
   self->session_cache = soup_cache_new(cache_path, SOUP_CACHE_SINGLE_USER);

@@ -26,8 +26,11 @@ const char *artemis_activator_get_callsign      (ArtemisActivator *self);
 const char *artemis_activator_get_name          (ArtemisActivator *self);
 const char *artemis_activator_get_qth           (ArtemisActivator *self);
 const char *artemis_activator_get_gravatar_hash (ArtemisActivator *self);
-int         artemis_activator_get_activations   (ArtemisActivator *self);
-int         artemis_activator_get_parks         (ArtemisActivator *self);
-int         artemis_activator_get_qsos          (ArtemisActivator *self);
+int
+artemis_activator_get_activations   (ArtemisActivator *self);
+int
+artemis_activator_get_parks         (ArtemisActivator *self);
+int
+artemis_activator_get_qsos          (ArtemisActivator *self);
 
 G_END_DECLS

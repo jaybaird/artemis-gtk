@@ -6,4 +6,5 @@
 void show_spot_page_with_spot(GtkWidget *parent, 
                               ArtemisSpot *spot); 
 
-void show_add_spot_page(GtkWidget *parent);
+void
+show_add_spot_page(GtkWidget *parent);

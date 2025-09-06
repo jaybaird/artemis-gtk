@@ -26,11 +26,14 @@ ArtemisActivator *artemis_pota_user_cache_get_finish(ArtemisPotaUserCache *self,
                                                      GAsyncResult         *result,
                                                      GError              **error);
 
-void artemis_pota_user_cache_clear(ArtemisPotaUserCache *self);
-void artemis_pota_user_cache_set_ttl_default(ArtemisPotaUserCache *self, guint ttl_seconds);
+void
+artemis_pota_user_cache_clear(ArtemisPotaUserCache *self);
+void
+artemis_pota_user_cache_set_ttl_default(ArtemisPotaUserCache *self, guint ttl_seconds);
 
 // Singleton access (initialized when first spot repo is created)
 ArtemisPotaUserCache *artemis_pota_user_cache_get_instance(void);
-void artemis_pota_user_cache_cleanup_instance(void);
+void
+artemis_pota_user_cache_cleanup_instance(void);
 
 G_END_DECLS

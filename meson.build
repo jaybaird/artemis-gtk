@@ -1,5 +1,5 @@
 project('Artemis', 'c',
-  version: '0.1',
+  version: '1.0',
   meson_version: '>= 1.4.0',
   default_options: ['c_std=c11', 'buildtype=debug']
 )
@@ -21,9 +21,14 @@ gnome = import('gnome')
 fs = import('fs')
 i18n = import('i18n')
 
+subdir('blueprint')
+
 resources = gnome.compile_resources(
   'artemis-resources',
-  'data/artemis.gresource.xml'
+  'data/artemis.gresource.xml',
+  source_dir: meson.current_build_dir() / 'blueprint',
+  dependencies: artemis_ui,
+  c_name: 'artemis'
 )
 
 gnome.post_install(
@@ -33,7 +38,9 @@ gnome.post_install(
 
 i18n.gettext(meson.project_name(), preset: 'glib', install: true)
 
+app_id = 'com.k0vcz.artemis'
 conf = configuration_data()
+conf.set_quoted('APP_ID', app_id)
 conf.set_quoted('GETTEXT_PACKAGE', meson.project_name())
 conf.set_quoted('LOCALEDIR', join_paths(get_option('prefix'), get_option('localedir')))
 configure_file(output: 'config.h', configuration: conf)

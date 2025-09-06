@@ -15,7 +15,8 @@ struct _ArtemisActivator {
 
 G_DEFINE_FINAL_TYPE(ArtemisActivator, artemis_activator, G_TYPE_OBJECT)
 
-static void artemis_activator_finalize(GObject *object) {
+static void
+artemis_activator_finalize(GObject *object) {
   ArtemisActivator *self = ARTEMIS_ACTIVATOR(object);
   
   g_clear_pointer(&self->callsign, g_free);
@@ -26,12 +27,14 @@ static void artemis_activator_finalize(GObject *object) {
   G_OBJECT_CLASS(artemis_activator_parent_class)->finalize(object);
 }
 
-static void artemis_activator_class_init(ArtemisActivatorClass *klass) {
+static void
+artemis_activator_class_init(ArtemisActivatorClass *klass) {
   GObjectClass *object_class = G_OBJECT_CLASS(klass);
   object_class->finalize = artemis_activator_finalize;
 }
 
-static void artemis_activator_init(ArtemisActivator *self) {
+static void
+artemis_activator_init(ArtemisActivator *self) {
   self->callsign = NULL;
   self->name = NULL;
   self->qth = NULL;
@@ -98,17 +101,20 @@ const char *artemis_activator_get_gravatar_hash(ArtemisActivator *self) {
   return self->gravatar_hash;
 }
 
-int artemis_activator_get_activations(ArtemisActivator *self) {
+int
+artemis_activator_get_activations(ArtemisActivator *self) {
   g_return_val_if_fail(ARTEMIS_IS_ACTIVATOR(self), 0);
   return self->activations;
 }
 
-int artemis_activator_get_parks(ArtemisActivator *self) {
+int
+artemis_activator_get_parks(ArtemisActivator *self) {
   g_return_val_if_fail(ARTEMIS_IS_ACTIVATOR(self), 0);
   return self->parks;
 }
 
-int artemis_activator_get_qsos(ArtemisActivator *self) {
+int
+artemis_activator_get_qsos(ArtemisActivator *self) {
   g_return_val_if_fail(ARTEMIS_IS_ACTIVATOR(self), 0);
   return self->qsos;
 }

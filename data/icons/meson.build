@@ -1,3 +1,9 @@
+# Install app icon
+install_data(
+  'hicolor/scalable/apps/com.k0vcz.artemis.svg',
+  install_dir: get_option('datadir') / 'icons' / 'hicolor' / 'scalable' / 'apps'
+)
+
 # Install symbolic icons
 install_data(
   [
@@ -27,6 +33,7 @@ install_data(
     'hicolor/scalable/status/band-10m.svg',
     'hicolor/scalable/status/band-6m.svg',
     'hicolor/scalable/status/band-2m.svg',
+    'hicolor/scalable/status/band-70cm.svg',
   ],
   install_dir: get_option('datadir') / 'icons' / 'hicolor' / 'scalable' / 'status'
 )

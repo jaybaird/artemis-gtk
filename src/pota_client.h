@@ -12,7 +12,8 @@ G_DECLARE_FINAL_TYPE(PotaClient, pota_client, ARTEMIS, POTA_CLIENT, GObject)
 
 PotaClient *pota_client_new(void);
 
-void        pota_client_set_timeout     (PotaClient *self, guint io_timeout_sec, guint idle_timeout_sec);
+void
+pota_client_set_timeout     (PotaClient *self, guint io_timeout_sec, guint idle_timeout_sec);
 
 void        pota_client_post_spot_async (PotaClient        *self,
                                          ArtemisSpot       *spot,

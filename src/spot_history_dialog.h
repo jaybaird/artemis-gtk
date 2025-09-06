@@ -13,8 +13,11 @@ SpotHistoryDialog *spot_history_dialog_new(void);
 void spot_history_dialog_set_callsign_and_park(SpotHistoryDialog *self, 
                                                 const char *callsign, 
                                                 const char *park_ref);
-void spot_history_dialog_show_loading(SpotHistoryDialog *self);
-void spot_history_dialog_show_error(SpotHistoryDialog *self, const char *error_message);
-void spot_history_dialog_show_history(SpotHistoryDialog *self, JsonNode *history_data);
+void
+spot_history_dialog_show_loading(SpotHistoryDialog *self);
+void
+spot_history_dialog_show_error(SpotHistoryDialog *self, const char *error_message);
+void
+spot_history_dialog_show_history(SpotHistoryDialog *self, JsonNode *history_data);
 
 G_END_DECLS

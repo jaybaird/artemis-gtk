@@ -2,8 +2,8 @@ using Gtk 4.0;
 using Adw 1;
 
 Window window {
-  default-width: 1152;
-  default-height: 648;
+  default-width: 1280;
+  default-height: 720;
   title: _("Artemis");
 
   [titlebar]
@@ -138,12 +138,7 @@ menu menu_app {
 
   section {
     item {
-      label: _("Help");
-      action: "app.help";
-    }
-    
-    item {
-      label: _("About");
+      label: _("About Artemis");
       action: "app.about";
     }
   }

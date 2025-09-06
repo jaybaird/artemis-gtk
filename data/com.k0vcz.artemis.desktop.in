@@ -4,5 +4,5 @@ Exec=artemis
 Icon=com.k0vcz.artemis
 Terminal=false
 Type=Application
-Categories=GTK;
+Categories=Utility;
 StartupNotify=true

@@ -32,9 +32,11 @@ const char *artemis_spot_get_park_name    (ArtemisSpot *self);
 const char *artemis_spot_get_location_desc(ArtemisSpot *self);
 const char *artemis_spot_get_mode         (ArtemisSpot *self);
 const char *artemis_spot_get_band         (ArtemisSpot *self);
-int         artemis_spot_get_frequency_hz (ArtemisSpot *self);
+int
+artemis_spot_get_frequency_hz (ArtemisSpot *self);
 GDateTime  *artemis_spot_get_spot_time    (ArtemisSpot *self); /* borrowed */
-int         artemis_spot_get_spot_count   (ArtemisSpot *self);
+int
+artemis_spot_get_spot_count   (ArtemisSpot *self);
 const char *artemis_spot_get_spotter      (ArtemisSpot *self);
 
 const char *artemis_spot_get_spotter_comment  (ArtemisSpot *self);
@@ -42,7 +44,8 @@ const char *artemis_spot_get_activator_comment(ArtemisSpot *self);
 
 /* Store helpers (backed by GListStore<ArtemisSpot>) */
 GListStore *artemis_spot_store_new(void);
-void        artemis_spot_store_add_json_array(GListStore *store, JsonArray *arr);
+void
+artemis_spot_store_add_json_array(GListStore *store, JsonArray *arr);
 
 
 G_END_DECLS

@@ -4,7 +4,8 @@
 
 #define HASH_UNSET  G_MAXUINT
 
-gchar* humanize_ago(GDateTime *t) {
+gchar*
+humanize_ago(GDateTime *t) {
 	if (!t) return g_strdup("unknown");
 
 	GDateTime *now = g_date_time_new_now(g_date_time_get_timezone(t));
@@ -29,7 +30,8 @@ gchar* humanize_ago(GDateTime *t) {
 	return g_strdup("more than an hour ago");
 }
 
-const char *format_title(const char *callsign, const char *park_ref)
+const char *
+format_title(const char *callsign, const char *park_ref)
 {
 	if (callsign && park_ref)
 		return g_strdup_printf("%s @ %s", callsign, park_ref);
@@ -39,13 +41,15 @@ const char *format_title(const char *callsign, const char *park_ref)
 	return g_strdup("POTA Spot");
 }   
 
-const char *park_uri_from_ref(const char *park_ref)
+const char *
+park_uri_from_ref(const char *park_ref)
 {
   if (!park_ref || !*park_ref) return g_strdup("https://pota.app");
     return g_strdup_printf("https://pota.app/#/park/%s", park_ref);
 }
 
-const char *band_from_hz(int hz) {
+const char *
+band_from_hz(int hz) {
   double mhz = (double)hz / 1e3;
   if (mhz >= 1.8   && mhz < 2.0)   return BANDS[1];
   if (mhz >= 3.5   && mhz < 4.1)   return BANDS[2];
@@ -62,7 +66,8 @@ const char *band_from_hz(int hz) {
   return "Other";
 }
 
-int gen_aprs_is_passcode(const char *callsign)
+int
+gen_aprs_is_passcode(const char *callsign)
 {
 	if (!callsign || !*callsign) return -1;
 
@@ -82,7 +87,8 @@ int gen_aprs_is_passcode(const char *callsign)
 	return (int)(hash & 0x7FFF);
 }
 
-guint hash_spot(ArtemisSpot *spot)
+guint
+hash_spot(ArtemisSpot *spot)
 {
   const char *callsign = artemis_spot_get_callsign(spot);
   const char *park_ref = artemis_spot_get_park_ref(spot);

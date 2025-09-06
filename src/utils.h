@@ -6,9 +6,11 @@ static const char *const BANDS[] = {
 };
 static const char *const MODES[] = { "SSB","CW","FT8","FM","AM","RTTY","JT65" };
 
-gchar* humanize_ago(GDateTime *t);
+gchar*
+humanize_ago(GDateTime *t);
 const char *format_title(const char *callsign, const char *park_ref);
 const char *park_uri_from_ref(const char *park_ref);
 
 const char *band_from_hz(int hz);
-guint hash_spot(ArtemisSpot *spot);
+guint
+hash_spot(ArtemisSpot *spot);

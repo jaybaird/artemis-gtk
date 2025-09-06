@@ -244,7 +244,8 @@ static void apply_border_css_class(GtkWidget *widget, const char *css_class, gbo
   }
 }
 
-static void spot_card_class_init(SpotCardClass *klass) {
+static void
+spot_card_class_init(SpotCardClass *klass) {
   g_type_ensure(ADW_TYPE_CLAMP);
   g_type_ensure(ADW_TYPE_AVATAR);
 
@@ -278,7 +279,8 @@ static void spot_card_class_init(SpotCardClass *klass) {
   G_OBJECT_CLASS(klass)->dispose = spot_card_dispose;
 }
 
-static void spot_card_init(SpotCard *self) {
+static void
+spot_card_init(SpotCard *self) {
   gtk_widget_init_template(GTK_WIDGET(self));
 }
 
@@ -286,7 +288,8 @@ SpotCard *spot_card_new(void) {
   return g_object_new(ARTEMIS_TYPE_SPOT_CARD, NULL);
 }
 
-static void on_avatar_data_fetched(GObject *source, GAsyncResult *result, gpointer user_data) {
+static void
+on_avatar_data_fetched(GObject *source, GAsyncResult *result, gpointer user_data) {
   ArtemisPotaUserCache *cache = ARTEMIS_POTA_USER_CACHE(source);
   AvatarUpdateData *data = (AvatarUpdateData *)user_data;
   

@@ -1,6 +1,7 @@
 #include "avatar.h"
 
-void avatar_update_data_free(AvatarUpdateData *data) {
+void
+avatar_update_data_free(AvatarUpdateData *data) {
   if (data) {
     g_free(data->callsign);
     g_free(data);
@@ -8,13 +9,15 @@ void avatar_update_data_free(AvatarUpdateData *data) {
 }
 
 // Generate Gravatar URL from hash
-static gchar* generate_gravatar_url(const char *gravatar_hash) {
+static gchar*
+generate_gravatar_url(const char *gravatar_hash) {
   if (!gravatar_hash || !*gravatar_hash) return NULL;
   
   return g_strdup_printf("https://www.gravatar.com/avatar/%s?s=64&d=identicon", gravatar_hash);
 }
 
-static void on_gravatar_loaded(GObject *source, GAsyncResult *result, gpointer user_data) {
+static void
+on_gravatar_loaded(GObject *source, GAsyncResult *result, gpointer user_data) {
   SoupSession *session = SOUP_SESSION(source);
   AvatarUpdateData *data = (AvatarUpdateData *)user_data;
   
@@ -52,7 +55,7 @@ static SoupCache *gravatar_cache = NULL;
 static SoupSession *get_gravatar_session(void) {
   if (!gravatar_session) {
     const gchar *data_dir = g_get_user_data_dir();
-    g_autofree gchar *app_dir = g_build_filename(data_dir, "com.k0vcz.artemis", NULL);
+    g_autofree gchar *app_dir = g_build_filename(data_dir, "artemis", NULL);
     g_mkdir_with_parents(app_dir, 0700);
     g_autofree gchar *cache_path = g_build_filename(app_dir, "gravatar.cache", NULL);
     gravatar_cache = soup_cache_new(cache_path, SOUP_CACHE_SINGLE_USER);
@@ -63,7 +66,8 @@ static SoupSession *get_gravatar_session(void) {
   return gravatar_session;
 }
 
-void avatar_fetch_gravatar_async(const char *gravatar_hash, AvatarUpdateData *data) {
+void
+avatar_fetch_gravatar_async(const char *gravatar_hash, AvatarUpdateData *data) {
   g_autofree gchar *gravatar_url = generate_gravatar_url(gravatar_hash);
   if (!gravatar_url) {
     g_debug("No gravatar_url generated for hash: %s", gravatar_hash ? gravatar_hash : "NULL");
