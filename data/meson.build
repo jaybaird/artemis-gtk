@@ -30,11 +30,12 @@ install_data('com.k0vcz.artemis.gschema.xml',
 
 gnome.compile_schemas(build_by_default: true, depend_files: files('com.k0vcz.artemis.gschema.xml'))
 
-configure_file(
+resource_xml = configure_file(
   input: 'artemis.gresource.xml.in',
   output: 'artemis.gresource.xml',
   configuration: {
-    'build_dir': meson.current_build_dir()
+    'build_dir': meson.project_build_root()
   }
 )
+
 subdir('icons')

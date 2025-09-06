@@ -22,10 +22,12 @@ fs = import('fs')
 i18n = import('i18n')
 
 subdir('blueprint')
+subdir('data')
+subdir('po')
 
 resources = gnome.compile_resources(
   'artemis-resources',
-  'data/artemis.gresource.xml',
+  resource_xml,
   source_dir: meson.current_build_dir() / 'blueprint',
   dependencies: artemis_ui,
   c_name: 'artemis'
@@ -71,6 +73,3 @@ executable('Artemis',
   dependencies: deps,
   include_directories: include_directories('src')
 )
-
-subdir('data')
-subdir('po')
