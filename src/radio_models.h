@@ -9,7 +9,7 @@ typedef struct {
 
 /* Stable radio models from hamlib - organized by manufacturer with visual separators */
 static const RadioModel RADIO_MODELS[] = {
-  { RIG_MODEL_NETRIGCTL, "NET rigctl" },
+  { RIG_MODEL_NETRIGCTL, "Network - rigctld" },
   { RIG_MODEL_FLRIG, "FLRig" },
   { RIG_MODEL_DUMMY, "Testing - Dummy Radio" },
   { RIG_MODEL_DUMMY_NOVFO, "Testing - Dummy No VFO" },

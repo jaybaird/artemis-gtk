@@ -22,8 +22,6 @@ static void artemis_app_activate(GApplication *app);
 static void artemis_app_class_init(ArtemisAppClass *class);
 static void artemis_app_init(ArtemisApp* self);
 static void artemis_app_dispose(GObject *object);
-static void artemis_app_start_connection_monitoring(ArtemisApp *self);
-static void artemis_app_stop_connection_monitoring(ArtemisApp *self);
 
 static guint app_signals[N_SIGNALS];
 
@@ -39,10 +37,6 @@ struct _ArtemisApp {
 
   ArtemisSpotRepo *repo;
   
-  // Radio connection management
-  RIG             *rig;
-  gboolean        radio_connected;
-  guint           radio_check_source_id; // For periodic connection checks
   gulong          settings_changed_handler; // For settings change monitoring
   GPtrArray       *pages;
 
@@ -95,237 +89,6 @@ band_view_free(BandView *view) {
     g_free(view->current_search_text);
     g_free(view->current_mode_filter);
     g_free(view);
-  }
-}
-
-// Radio connection task data
-typedef struct {
-  ArtemisApp *app;
-  gint model_id;
-  gchar *connection_type;
-  gchar *device_path;
-  gchar *network_host;
-  gint network_port;
-  gint baud_rate;
-} RadioConnectionData;
-
-static void
-radio_connection_data_free(RadioConnectionData *data) {
-  if (data) {
-    g_object_unref(data->app);
-    g_free(data->connection_type);
-    g_free(data->device_path);
-    g_free(data->network_host);
-    g_free(data);
-  }
-}
-
-// Background thread radio connection function
-static void radio_connection_thread_func(GTask *task, gpointer source_object, 
-                                        gpointer task_data, GCancellable *cancellable)
-{
-  RadioConnectionData *data = (RadioConnectionData *)task_data;
-  RIG *rig = NULL;
-  GError *error = NULL;
-  
-  // Initialize rig
-  rig = rig_init(data->model_id);
-  if (!rig) {
-    g_set_error(&error, G_IO_ERROR, G_IO_ERROR_FAILED, 
-                "Failed to initialize radio model %d", data->model_id);
-    g_task_return_error(task, error);
-    return;
-  }
-  
-  // Configure connection based on type
-  if (g_strcmp0(data->connection_type, "serial") == 0 || g_strcmp0(data->connection_type, "usb") == 0) {
-    strncpy(rig->state.rigport.pathname, data->device_path, HAMLIB_FILPATHLEN - 1);
-    rig->state.rigport.parm.serial.rate = data->baud_rate;
-  } else if (g_strcmp0(data->connection_type, "network") == 0) {
-    g_snprintf(rig->state.rigport.pathname, HAMLIB_FILPATHLEN, "%s:%d", 
-               data->network_host, data->network_port);
-  }
-  
-  // Attempt connection
-  int result = rig_open(rig);
-  if (result != RIG_OK) {
-    g_set_error(&error, G_IO_ERROR, G_IO_ERROR_CONNECTION_REFUSED,
-                "Failed to connect to radio: %s", rigerror(result));
-    rig_cleanup(rig);
-    g_task_return_error(task, error);
-    return;
-  }
-  
-  // Success - return the rig
-  g_task_return_pointer(task, rig, (GDestroyNotify)rig_cleanup);
-}
-
-// Async callback when radio connection completes
-static void on_radio_connection_complete(GObject *source, GAsyncResult *result, gpointer user_data)
-{
-  ArtemisApp *self = ARTEMIS_APP(user_data);
-  GError *error = NULL;
-  
-  RIG *rig = g_task_propagate_pointer(G_TASK(result), &error);
-  
-  if (rig) {
-    // Success - store the rig and mark as connected
-    self->rig = rig;
-    self->radio_connected = TRUE;
-    g_debug("Radio connected successfully");
-    
-    // Start monitoring now that we're connected
-    artemis_app_start_connection_monitoring(self);
-  } else {
-    // Failed - log the error but don't block the app
-    g_warning("Radio connection failed: %s", error ? error->message : "Unknown error");
-    g_clear_error(&error);
-    self->rig = NULL;
-    self->radio_connected = FALSE;
-  }
-}
-
-// Radio connection management functions
-static void artemis_app_init_radio_connection_async(ArtemisApp *self)
-{
-  GSettings *settings = artemis_app_get_settings();
-  
-  // Check if radio is configured
-  g_autofree gchar *connection_type = g_settings_get_string(settings, "radio-connection-type");
-  if (g_strcmp0(connection_type, "none") == 0) {
-    return; // No radio configured
-  }
-  
-  // Prepare connection data
-  RadioConnectionData *data = g_new0(RadioConnectionData, 1);
-  data->app = g_object_ref(self);
-  data->model_id = g_settings_get_int(settings, "radio-model");
-  data->connection_type = g_strdup(connection_type);
-  data->device_path = g_settings_get_string(settings, "radio-device");
-  data->network_host = g_settings_get_string(settings, "radio-network-host");
-  data->network_port = g_settings_get_int(settings, "radio-network-port");
-  data->baud_rate = g_settings_get_int(settings, "radio-baud-rate");
-  
-  // Create and run async task
-  GTask *task = g_task_new(self, NULL, on_radio_connection_complete, self);
-  g_task_set_task_data(task, data, (GDestroyNotify)radio_connection_data_free);
-  g_task_run_in_thread(task, radio_connection_thread_func);
-  g_object_unref(task);
-  
-  g_debug("Radio connection started in background thread");
-}
-
-static void artemis_app_disconnect_radio(ArtemisApp *self)
-{
-  if (self->rig && self->radio_connected) {
-    // Safely close the rig connection
-    int close_result = rig_close(self->rig);
-    if (close_result != RIG_OK) {
-      g_warning("Error closing radio connection: %s", rigerror(close_result));
-    }
-    self->radio_connected = FALSE;
-    g_debug("Radio disconnected");
-  }
-}
-
-static void artemis_app_reconnect_radio_async(ArtemisApp *self)
-{
-  // Stop monitoring during reconnection
-  artemis_app_stop_connection_monitoring(self);
-  
-  // Disconnect existing connection
-  artemis_app_disconnect_radio(self);
-  
-  // Clean up existing rig
-  if (self->rig) {
-    rig_cleanup(self->rig);
-    self->rig = NULL;
-  }
-  
-  // Re-initialize connection asynchronously
-  artemis_app_init_radio_connection_async(self);
-}
-
-// Periodic radio connection check
-static gboolean radio_connection_check(gpointer user_data)
-{
-  ArtemisApp *self = ARTEMIS_APP(user_data);
-  
-  if (!self->rig || !self->radio_connected) {
-    return G_SOURCE_CONTINUE; // Keep checking
-  }
-  
-  // Test connection with a simple command - with crash protection
-  if (!self->rig) {
-    g_debug("Rig is NULL, skipping connection check");
-    self->radio_connected = FALSE;
-    return G_SOURCE_CONTINUE;
-  }
-  
-  freq_t freq;
-  int result = -1;
-  
-  // Additional validation before calling hamlib
-  if (self->rig->caps == NULL || self->rig->state.comm_state != RIG_OK) {
-    g_warning("Rig is in invalid state, marking as disconnected");
-    self->radio_connected = FALSE;
-    return G_SOURCE_CONTINUE;
-  }
-  
-  result = rig_get_freq(self->rig, RIG_VFO_CURR, &freq);
-  
-  if (result != RIG_OK) {
-    g_warning("Radio connection check failed: %s", rigerror(result));
-    self->radio_connected = FALSE;
-    
-    // Try to reconnect automatically
-    artemis_app_reconnect_radio_async(self);
-  }
-  
-  return G_SOURCE_CONTINUE;
-}
-
-// Settings change monitoring
-static void on_radio_settings_changed(GSettings *settings, gchar *key, gpointer user_data)
-{
-  ArtemisApp *self = ARTEMIS_APP(user_data);
-  
-  // Only reconnect if radio-related settings changed
-  if (g_str_has_prefix(key, "radio-")) {
-    g_debug("Radio settings changed (%s), reconnecting...", key);
-    artemis_app_reconnect_radio_async(self);
-  }
-}
-
-static void artemis_app_start_connection_monitoring(ArtemisApp *self)
-{
-  GSettings *settings = artemis_app_get_settings();
-  
-  // Start periodic connection check (every 30 seconds)
-  if (self->radio_check_source_id == 0) {
-    self->radio_check_source_id = g_timeout_add_seconds(30, radio_connection_check, self);
-  }
-  
-  // Monitor settings changes
-  if (self->settings_changed_handler == 0) {
-    self->settings_changed_handler = g_signal_connect(settings, "changed", 
-                                                      G_CALLBACK(on_radio_settings_changed), self);
-  }
-}
-
-static void artemis_app_stop_connection_monitoring(ArtemisApp *self)
-{
-  // Remove periodic check
-  if (self->radio_check_source_id > 0) {
-    g_source_remove(self->radio_check_source_id);
-    self->radio_check_source_id = 0;
-  }
-  
-  // Remove settings monitoring
-  GSettings *settings = artemis_app_get_settings();
-  if (self->settings_changed_handler > 0) {
-    g_signal_handler_disconnect(settings, self->settings_changed_handler);
-    self->settings_changed_handler = 0;
   }
 }
 
@@ -821,55 +584,6 @@ static void on_tune_frequency(ArtemisApp *app, guint64 frequency_khz, ArtemisSpo
   
   // Update visual state on the next idle cycle to ensure all signal handlers have run
   g_idle_add((GSourceFunc)artemis_app_update_all_spot_cards_pinned_state, self);
-  
-  // Check if radio is connected, if not we updated the pinned state to "track" or reset and now we bail
-  if (!self->rig || !self->radio_connected) {
-    return;
-  }
-  
-  freq_t freq_hz = (freq_t)(frequency_khz * 1000); // Convert MHz to Hz
-  int set_result = -1;
-  
-  // Additional validation before calling hamlib
-  if (!self->rig || self->rig->caps == NULL) {
-    g_warning("Rig is NULL or has invalid caps, cannot set frequency");
-    // Show error dialog
-    AdwDialog *alert = adw_alert_dialog_new(_("Radio Error"), _("Radio is not properly initialized. Please check your radio settings."));
-    adw_alert_dialog_add_response(ADW_ALERT_DIALOG(alert), "ok", _("OK"));
-    adw_alert_dialog_set_default_response(ADW_ALERT_DIALOG(alert), "ok");
-    adw_dialog_present(alert, GTK_WIDGET(self->window));
-    return;
-  }
-  
-  set_result = rig_set_freq(self->rig, RIG_VFO_CURR, freq_hz);
-  
-  if (set_result == RIG_OK) {
-    // Success - show toast
-    g_autofree gchar *msg = g_strdup_printf("Tuned radio to %.3f MHz", frequency_khz / 1000.0f);
-    AdwToast *toast = adw_toast_new(msg);
-    adw_toast_overlay_add_toast(self->toast_overlay, toast);
-  } else {
-    // Error setting frequency - try to reconnect and retry once
-    g_warning("Radio frequency setting failed: %s, attempting reconnect", rigerror(set_result));
-    artemis_app_reconnect_radio_async(self);
-    
-    if (self->rig && self->radio_connected && self->rig->caps) {
-      set_result = rig_set_freq(self->rig, RIG_VFO_CURR, freq_hz);
-      if (set_result == RIG_OK) {
-        g_autofree gchar *msg = g_strdup_printf("Tuned radio to %.3f MHz (after reconnect)", frequency_khz / 1000.0f);
-        AdwToast *toast = adw_toast_new(msg);
-        adw_toast_overlay_add_toast(self->toast_overlay, toast);
-        return;
-      }
-    }
-    
-    // Still failed - show error dialog
-    g_autofree gchar *error_detail = g_strdup_printf("Failed to set frequency: %s\n\nPlease verify your radio is responding correctly and try again.", rigerror(set_result));
-    AdwAlertDialog *alert = ADW_ALERT_DIALOG(adw_alert_dialog_new("Frequency Setting Failed", error_detail));
-    adw_alert_dialog_add_response(alert, "ok", "OK");
-    adw_alert_dialog_set_default_response(alert, "ok");
-    adw_dialog_present(ADW_DIALOG(alert), GTK_WIDGET(self->window));
-  }
 }
 
 static void artemis_app_class_init(ArtemisAppClass *klass)
@@ -1096,9 +810,6 @@ GtkWindow *artemis_app_build_ui(ArtemisApp *self, GtkApplication *app) {
   g_signal_connect(app, "spot-submitted", G_CALLBACK(on_spot_submitted), NULL);
   g_signal_connect(app, "tune-frequency", G_CALLBACK(on_tune_frequency), self);
 
-  // Initialize radio connection if configured
-  artemis_app_init_radio_connection_async(self);
-
   return win;
 }
 
@@ -1157,28 +868,6 @@ artemis_app_dispose(GObject *object) {
     self->time_source_id = 0;
   }
 
-  // Stop radio connection monitoring
-  artemis_app_stop_connection_monitoring(self);
-
-  // Cleanup radio connection with crash protection
-  if (self->rig) {
-    if (self->radio_connected) {
-      int close_result = rig_close(self->rig);
-      if (close_result != RIG_OK) {
-        g_warning("Error closing radio during cleanup: %s", rigerror(close_result));
-      }
-    }
-    
-    // Safely cleanup the rig
-    int cleanup_result = rig_cleanup(self->rig);
-    if (cleanup_result != RIG_OK) {
-      g_warning("Error during rig cleanup: %s", rigerror(cleanup_result));
-    }
-    
-    self->rig = NULL;
-  }
-  self->radio_connected = FALSE;
-
   g_clear_pointer(&self->search_text, g_free);
   g_clear_pointer(&self->current_mode_filter, g_free);
 
@@ -1208,8 +897,6 @@ static void artemis_app_init(ArtemisApp* self)
 
   self->repo = artemis_spot_repo_new();
   
-  // Initialize radio monitoring fields
-  self->radio_check_source_id = 0;
   self->settings_changed_handler = 0;
   
   // Initialize pinned spot
@@ -1296,9 +983,4 @@ ArtemisSpotRepo *artemis_app_get_spot_repo(ArtemisApp *app)
 {
   g_return_val_if_fail(ARTEMIS_IS_APP(app), NULL);
   return app->repo;
-}
-
-gboolean artemis_app_is_rig_connected(ArtemisApp *app)
-{
-  return app->rig && app->radio_connected;
 }

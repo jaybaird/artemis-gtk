@@ -15,6 +15,7 @@ deps = [
   dependency('json-glib-1.0', required: true),
   dependency('libsoup-3.0', required: true),
   dependency('hamlib', required: true),
+  dependency('libdex-1', required: true),
   dependency('sqlite3'),
   cc.find_library('m')
 ]

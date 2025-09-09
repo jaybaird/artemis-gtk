@@ -9,5 +9,6 @@ typedef struct {
 
 void
 avatar_update_data_free(AvatarUpdateData *data);
+
 void
 avatar_fetch_gravatar_async(const char *gravatar_hash, AvatarUpdateData *data);
