@@ -66,7 +66,8 @@ ArtemisActivator *artemis_activator_new(
   return self;
 }
 
-ArtemisActivator *artemis_activator_new_from_json(JsonObject *obj) {
+ArtemisActivator *
+artemis_activator_new_from_json(JsonObject *obj) {
   g_return_val_if_fail(obj != NULL, NULL);
   
   const char *callsign = json_object_get_string_member_with_default(obj, "callsign", "");
@@ -81,22 +82,26 @@ ArtemisActivator *artemis_activator_new_from_json(JsonObject *obj) {
   return artemis_activator_new(callsign, name, qth, gravatar_hash, activations, parks, qsos);
 }
 
-const char *artemis_activator_get_callsign(ArtemisActivator *self) {
+gchar *
+artemis_activator_get_callsign(ArtemisActivator *self) {
   g_return_val_if_fail(ARTEMIS_IS_ACTIVATOR(self), NULL);
   return self->callsign;
 }
 
-const char *artemis_activator_get_name(ArtemisActivator *self) {
+gchar *
+artemis_activator_get_name(ArtemisActivator *self) {
   g_return_val_if_fail(ARTEMIS_IS_ACTIVATOR(self), NULL);
   return self->name;
 }
 
-const char *artemis_activator_get_qth(ArtemisActivator *self) {
+gchar *
+artemis_activator_get_qth(ArtemisActivator *self) {
   g_return_val_if_fail(ARTEMIS_IS_ACTIVATOR(self), NULL);
   return self->qth;
 }
 
-const char *artemis_activator_get_gravatar_hash(ArtemisActivator *self) {
+gchar *
+artemis_activator_get_gravatar_hash(ArtemisActivator *self) {
   g_return_val_if_fail(ARTEMIS_IS_ACTIVATOR(self), NULL);
   return self->gravatar_hash;
 }

@@ -1,9 +1,13 @@
 #include "config.h"
 #include "artemis.h"
 
+#include <libdex.h>
+
 int
 main(int argc, char** argv)
 {
+    dex_init();
+
     bindtextdomain(GETTEXT_PACKAGE, LOCALEDIR);
     bind_textdomain_codeset(GETTEXT_PACKAGE, "UTF-8");
     textdomain(GETTEXT_PACKAGE);

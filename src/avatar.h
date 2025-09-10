@@ -1,5 +1,6 @@
 #include <glib.h>
 #include <adwaita.h>
+#include <libdex.h>
 #include <libsoup/soup.h>
 
 typedef struct {
@@ -10,5 +11,5 @@ typedef struct {
 void
 avatar_update_data_free(AvatarUpdateData *data);
 
-void
-avatar_fetch_gravatar_async(const char *gravatar_hash, AvatarUpdateData *data);
+DexFuture *
+avatar_fetch_gravatar_async(gchar *gravatar_hash, AdwAvatar *avatar, gchar *callsign);

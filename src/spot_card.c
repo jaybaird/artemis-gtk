@@ -1,12 +1,5 @@
 #include "spot_card.h"
 
-#include "adwaita.h"
-#include "gio/gio.h"
-#include "glib-object.h"
-#include "glib.h"
-#include "glibconfig.h"
-#include "gtk/gtk.h"
-#include "gtk/gtkshortcut.h"
 #include "preferences.h"
 #include "spot.h"
 #include "spot_page.h"
@@ -299,14 +292,9 @@ static void on_avatar_data_fetched(GObject *source, GAsyncResult *result, gpoint
       adw_avatar_set_text(data->target_avatar, name);
     }
     
-    const char *gravatar_hash = artemis_activator_get_gravatar_hash(activator);
+    gchar *gravatar_hash = artemis_activator_get_gravatar_hash(activator);
     if (gravatar_hash && *gravatar_hash) {
-      // Create new data for Gravatar callback (don't free the current one yet)
-      AvatarUpdateData *gravatar_data = g_new0(AvatarUpdateData, 1);
-      gravatar_data->target_avatar = data->target_avatar;
-      gravatar_data->callsign = g_strdup(data->callsign);
-      
-      avatar_fetch_gravatar_async(gravatar_hash, gravatar_data);
+      dex_future_disown(avatar_fetch_gravatar_async(gravatar_hash, data->target_avatar, data->callsign));
     }
     
     g_object_unref(activator);
@@ -325,7 +313,6 @@ static void on_avatar_data_fetched(GObject *source, GAsyncResult *result, gpoint
 
 GtkWidget *spot_card_new_from_spot(gpointer user_data)
 {
-  ArtemisApp *app = ARTEMIS_APP(g_application_get_default());
   ArtemisSpot *spot = ARTEMIS_SPOT(user_data);
   SpotCard *card = spot_card_new();
 
